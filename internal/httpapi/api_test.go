@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/goosecanvas/goosecanvas/internal/config"
-	"github.com/goosecanvas/goosecanvas/internal/storage"
+	"github.com/BigGoose-dae/GooseCanvas/internal/config"
+	"github.com/BigGoose-dae/GooseCanvas/internal/storage"
 )
 
 func TestStatusHandlesTypedNilStore(t *testing.T) {

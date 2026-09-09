@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/goosecanvas/goosecanvas/internal/config"
+	"github.com/BigGoose-dae/GooseCanvas/internal/config"
 )
 
 func TestSubmitImage(t *testing.T) {

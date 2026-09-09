@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/goosecanvas/goosecanvas/internal/config"
+	"github.com/BigGoose-dae/GooseCanvas/internal/config"
 )
 
 type Volcengine struct {

@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/goosecanvas/goosecanvas/internal/config"
-	"github.com/goosecanvas/goosecanvas/internal/database"
-	"github.com/goosecanvas/goosecanvas/internal/events"
-	"github.com/goosecanvas/goosecanvas/internal/generation"
-	"github.com/goosecanvas/goosecanvas/internal/httpapi"
-	"github.com/goosecanvas/goosecanvas/internal/runtime"
+	"github.com/BigGoose-dae/GooseCanvas/internal/config"
+	"github.com/BigGoose-dae/GooseCanvas/internal/database"
+	"github.com/BigGoose-dae/GooseCanvas/internal/events"
+	"github.com/BigGoose-dae/GooseCanvas/internal/generation"
+	"github.com/BigGoose-dae/GooseCanvas/internal/httpapi"
+	"github.com/BigGoose-dae/GooseCanvas/internal/runtime"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/goosecanvas/goosecanvas/internal/domain"
+	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

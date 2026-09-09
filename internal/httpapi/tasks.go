@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/goosecanvas/goosecanvas/internal/domain"
+	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
 	"gorm.io/gorm"
 )
 

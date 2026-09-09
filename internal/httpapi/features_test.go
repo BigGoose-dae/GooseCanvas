@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/goosecanvas/goosecanvas/internal/config"
-	"github.com/goosecanvas/goosecanvas/internal/database"
-	"github.com/goosecanvas/goosecanvas/internal/domain"
-	"github.com/goosecanvas/goosecanvas/internal/events"
-	"github.com/goosecanvas/goosecanvas/internal/runtime"
+	"github.com/BigGoose-dae/GooseCanvas/internal/config"
+	"github.com/BigGoose-dae/GooseCanvas/internal/database"
+	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
+	"github.com/BigGoose-dae/GooseCanvas/internal/events"
+	"github.com/BigGoose-dae/GooseCanvas/internal/runtime"
 )
 
 func featureAPI(t *testing.T) (*API, *gin.Engine) {

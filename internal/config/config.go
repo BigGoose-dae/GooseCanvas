@@ -62,7 +62,7 @@ func Load() (Config, error) {
 	cfg := Config{
 		AppName:  env("APP_NAME", "Goose Canvas"),
 		LogoURL:  strings.TrimSpace(os.Getenv("APP_LOGO_URL")),
-		RepoURL:  env("APP_REPOSITORY_URL", "https://github.com/goosecanvas/goosecanvas"),
+		RepoURL:  env("APP_REPOSITORY_URL", "https://github.com/BigGoose-dae/GooseCanvas"),
 		Addr:     env("APP_ADDR", "127.0.0.1:8080"),
 		DataDir:  dataDir,
 		Database: filepath.Join(dataDir, "goose-canvas.db"),

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/goosecanvas/goosecanvas/internal/config"
+	"github.com/BigGoose-dae/GooseCanvas/internal/config"
 	"github.com/volcengine/ve-tos-golang-sdk/v2/tos"
 	"github.com/volcengine/ve-tos-golang-sdk/v2/tos/enum"
 )

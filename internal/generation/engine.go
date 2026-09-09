@@ -14,12 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/goosecanvas/goosecanvas/internal/config"
-	"github.com/goosecanvas/goosecanvas/internal/domain"
-	"github.com/goosecanvas/goosecanvas/internal/events"
-	"github.com/goosecanvas/goosecanvas/internal/provider"
-	"github.com/goosecanvas/goosecanvas/internal/runtime"
-	"github.com/goosecanvas/goosecanvas/internal/storage"
+	"github.com/BigGoose-dae/GooseCanvas/internal/config"
+	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
+	"github.com/BigGoose-dae/GooseCanvas/internal/events"
+	"github.com/BigGoose-dae/GooseCanvas/internal/provider"
+	"github.com/BigGoose-dae/GooseCanvas/internal/runtime"
+	"github.com/BigGoose-dae/GooseCanvas/internal/storage"
 	"gorm.io/gorm"
 )
 

@@ -1,4 +1,4 @@
-module github.com/goosecanvas/goosecanvas
+module github.com/BigGoose-dae/GooseCanvas
 
 go 1.23
 
