@@ -1,0 +1,195 @@
+:root {
+  --surface-page: #090a0d;
+  --surface-raised: #111319;
+  --surface-soft: #181b22;
+  --surface-glass: rgba(9, 10, 13, 0.82);
+  --line: #252932;
+  --line-strong: #343844;
+  --text: #f4f5f7;
+  --text-soft: #aeb2bd;
+  --text-muted: #737986;
+  --accent: #6e5af2;
+}
+
+:root[data-theme='light'] {
+  --surface-page: #f5f5f3;
+  --surface-raised: #ffffff;
+  --surface-soft: #ececea;
+  --surface-glass: rgba(250, 250, 248, 0.86);
+  --line: #d9d9d5;
+  --line-strong: #c5c5c0;
+  --text: #161719;
+  --text-soft: #4f535a;
+  --text-muted: #73777e;
+  --accent: #17181b;
+}
+
+html,
+body,
+#root {
+  background: var(--surface-page);
+  color: var(--text);
+}
+
+.theme-toggle {
+  display: grid !important;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  flex: 0 0 34px;
+  padding: 0 !important;
+  border: 1px solid var(--line-strong) !important;
+  border-radius: 50% !important;
+  background: var(--surface-soft) !important;
+  color: var(--text) !important;
+  font-size: 16px !important;
+  line-height: 1;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+:root[data-theme='light'] .projects-page {
+  background:
+    radial-gradient(circle at 15% 8%, rgba(0, 0, 0, 0.045), transparent 30%),
+    #f5f5f3;
+}
+
+:root[data-theme='light'] .topbar,
+:root[data-theme='light'] .canvas-bar {
+  border-bottom-color: var(--line);
+  background: var(--surface-glass);
+}
+
+:root[data-theme='light'] .brand span,
+:root[data-theme='light'] .hero-copy p,
+:root[data-theme='light'] .section-title p,
+:root[data-theme='light'] .project-info p,
+:root[data-theme='light'] .topbar a,
+:root[data-theme='light'] .top-links button,
+:root[data-theme='light'] .settings-back,
+:root[data-theme='light'] .canvas-help,
+:root[data-theme='light'] .project-name {
+  color: var(--text-muted);
+}
+
+:root[data-theme='light'] .brand img {
+  border-radius: 0;
+}
+
+:root[data-theme='light'] .project-card,
+:root[data-theme='light'] .model-row,
+:root[data-theme='light'] .model-form {
+  border-color: var(--line);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 10px 30px rgba(20, 22, 26, 0.05);
+}
+
+:root[data-theme='light'] .project-cover {
+  background: linear-gradient(135deg, #eeeeeb, #deded9);
+}
+
+:root[data-theme='light'] .project-cover span {
+  color: #555960;
+}
+
+:root[data-theme='light'] .section-title input,
+:root[data-theme='light'] .model-form input,
+:root[data-theme='light'] .model-form select,
+:root[data-theme='light'] .model-form textarea,
+:root[data-theme='light'] .context-menu form input,
+:root[data-theme='light'] .node-inspector select,
+:root[data-theme='light'] .node-inspector textarea {
+  border-color: var(--line);
+  background: #fafaf8;
+  color: var(--text);
+}
+
+:root[data-theme='light'] .models-page,
+:root[data-theme='light'] .canvas-page {
+  background: var(--surface-page);
+  color: var(--text);
+}
+
+:root[data-theme='light'] .flow-stage .react-flow,
+:root[data-theme='light'] .flow-stage .react-flow__pane {
+  background: #efefec;
+}
+
+:root[data-theme='light'] .back,
+:root[data-theme='light'] .canvas-actions button,
+:root[data-theme='light'] .model-actions button,
+:root[data-theme='light'] .form-actions button {
+  border-color: var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+:root[data-theme='light'] .canvas-actions button:last-of-type,
+:root[data-theme='light'] .section-title button,
+:root[data-theme='light'] .inspector-run,
+:root[data-theme='light'] .form-actions .primary,
+:root[data-theme='light'] .model-title button {
+  background: #17181b;
+  color: #ffffff;
+}
+
+:root[data-theme='light'] .workshop-node {
+  border-color: rgba(18, 20, 24, 0.24);
+  background: rgba(255, 255, 255, 0.9);
+  color: #17181b;
+  box-shadow: 0 7px 20px rgba(18, 20, 24, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+:root[data-theme='light'] .workshop-node:hover,
+:root[data-theme='light'] .workshop-node.selected {
+  background: #ffffff;
+}
+
+:root[data-theme='light'] .workshop-node.selected {
+  border-color: #20242b;
+  box-shadow: 0 0 0 2px rgba(20, 22, 26, 0.12), 0 8px 22px rgba(20, 22, 26, 0.13);
+}
+
+:root[data-theme='light'] .workshop-node-title {
+  background: rgba(255, 255, 255, 0.9);
+  color: #34383f;
+}
+
+:root[data-theme='light'] .workshop-text-view,
+:root[data-theme='light'] .workshop-text {
+  background: #ffffff;
+  color: #202329;
+}
+
+:root[data-theme='light'] .workshop-text-view.empty {
+  color: #8b8e93;
+}
+
+:root[data-theme='light'] .node-inspector,
+:root[data-theme='light'] .context-menu,
+:root[data-theme='light'] .canvas-scale {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgba(18, 20, 24, 0.12);
+}
+
+:root[data-theme='light'] .context-menu button,
+:root[data-theme='light'] .inspector-head input {
+  color: var(--text);
+}
+
+:root[data-theme='light'] .context-menu button:hover,
+:root[data-theme='light'] .context-menu button.primary {
+  background: rgba(0, 0, 0, 0.055);
+}
+
+:root[data-theme='light'] .flow-stage .react-flow__edge-path {
+  stroke: rgba(18, 20, 24, 0.45);
+}

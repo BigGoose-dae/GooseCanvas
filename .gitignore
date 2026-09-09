@@ -1,0 +1,11 @@
+.env
+config.yaml
+data/*
+!data/.gitkeep
+web/node_modules/
+web/dist/
+bin/
+*.log
+.DS_Store
+.idea/
+.vscode/

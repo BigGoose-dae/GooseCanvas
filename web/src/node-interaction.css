@@ -1,0 +1,66 @@
+.workshop-node:active {
+  cursor: grabbing;
+}
+
+.workshop-media img {
+  pointer-events: none;
+}
+
+.workshop-text-view {
+  width: 100%;
+  height: 100%;
+  padding: 18px;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgba(17, 18, 22, 0.78);
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  user-select: none;
+  cursor: move;
+}
+
+.workshop-text-view.empty {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.workshop-video-poster {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #090a0d;
+}
+
+.workshop-video-poster video {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.workshop-video-poster::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.28));
+}
+
+.workshop-video-poster button {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  padding: 0 0 0 3px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  background: rgba(12, 14, 18, 0.72);
+  color: white;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
