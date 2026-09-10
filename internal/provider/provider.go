@@ -1,11 +1,15 @@
 package provider
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 type Input struct {
-	Type string `json:"type"`
-	Role string `json:"role"`
-	URL  string `json:"url"`
+	Type    string `json:"type"`
+	Role    string `json:"role"`
+	MIME    string `json:"mime"`
+	DataURI string `json:"-"`
 }
 
 type Request struct {
@@ -40,4 +44,14 @@ type Model struct {
 	Inputs      []string       `json:"inputs"`
 	Defaults    map[string]any `json:"defaults"`
 	Options     map[string]any `json:"options"`
+}
+
+// HTTPError distinguishes a definitive provider rejection from an interrupted request.
+type HTTPError struct {
+	Status  int
+	Message string
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("生成服务返回 HTTP %d: %s", e.Status, e.Message)
 }

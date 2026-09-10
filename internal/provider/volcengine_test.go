@@ -3,8 +3,10 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/BigGoose-dae/GooseCanvas/internal/config"
@@ -23,7 +25,7 @@ func TestSubmitImage(t *testing.T) {
 			t.Fatal(err)
 		}
 		images, ok := body["image"].([]any)
-		if !ok || len(images) != 1 || images[0] != "https://storage.example/input.png" {
+		if !ok || len(images) != 1 || images[0] != "data:image/png;base64,aW1hZ2U=" {
 			t.Fatalf("image input = %#v", body["image"])
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -32,7 +34,7 @@ func TestSubmitImage(t *testing.T) {
 	defer server.Close()
 
 	client := NewVolcengine(config.Volcengine{APIKey: "test-key", BaseURL: server.URL})
-	result, err := client.Submit(context.Background(), Request{TaskType: "image", Model: "image-model", Prompt: "a goose", Inputs: []Input{{Type: "image", URL: "https://storage.example/input.png"}}})
+	result, err := client.Submit(context.Background(), Request{TaskType: "image", Model: "image-model", Prompt: "a goose", Inputs: []Input{{Type: "image", DataURI: "data:image/png;base64,aW1hZ2U="}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,6 +56,11 @@ func TestSubmitAndPollVideo(t *testing.T) {
 			if !ok || len(content) != 2 {
 				t.Fatalf("content = %#v", body["content"])
 			}
+			input, _ := content[1].(map[string]any)
+			imageURL, _ := input["image_url"].(map[string]any)
+			if imageURL["url"] != "data:image/png;base64,aW1hZ2U=" {
+				t.Fatalf("video image input = %#v", input)
+			}
 			_, _ = w.Write([]byte(`{"id":"video-task-1"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v3/contents/generations/tasks/video-task-1":
 			_, _ = w.Write([]byte(`{"status":"succeeded","content":{"video_url":"https://provider.example/result.mp4"}}`))
@@ -64,7 +71,7 @@ func TestSubmitAndPollVideo(t *testing.T) {
 	defer server.Close()
 
 	client := NewVolcengine(config.Volcengine{APIKey: "test-key", BaseURL: server.URL})
-	submitted, err := client.Submit(context.Background(), Request{TaskType: "video", Model: "video-model", Prompt: "take flight", Inputs: []Input{{Type: "image", Role: "reference", URL: "https://storage.example/input.png"}}})
+	submitted, err := client.Submit(context.Background(), Request{TaskType: "video", Model: "video-model", Prompt: "take flight", Inputs: []Input{{Type: "image", Role: "reference", DataURI: "data:image/png;base64,aW1hZ2U="}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,5 +84,23 @@ func TestSubmitAndPollVideo(t *testing.T) {
 	}
 	if !result.Done || result.URL != "https://provider.example/result.mp4" {
 		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestProviderErrorRedactsCredential(t *testing.T) {
+	secret := "fixture-secret-that-must-not-be-logged"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(401)
+		json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "Rejected " + secret}})
+	}))
+	defer server.Close()
+	client := NewVolcengine(config.Volcengine{APIKey: secret, BaseURL: server.URL})
+	_, err := client.Submit(context.Background(), Request{TaskType: "image", Model: "mock"})
+	if err == nil || strings.Contains(err.Error(), secret) || !strings.Contains(err.Error(), "[REDACTED]") {
+		t.Fatal("provider error leaked credential")
+	}
+	var response *HTTPError
+	if !errors.As(err, &response) || response.Status != 401 {
+		t.Fatal("provider rejection was not classified")
 	}
 }

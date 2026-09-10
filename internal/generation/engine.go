@@ -3,7 +3,9 @@ package generation
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,7 +28,6 @@ import (
 type Engine struct {
 	db       *gorm.DB
 	store    storage.Store
-	tos      *storage.TOSStore
 	provider provider.Provider
 	cfg      config.Config
 	http     *http.Client
@@ -38,8 +39,8 @@ type Engine struct {
 	wg       sync.WaitGroup
 }
 
-func New(db *gorm.DB, store storage.Store, tosStore *storage.TOSStore, p provider.Provider, cfg config.Config) *Engine {
-	return &Engine{db: db, store: store, tos: tosStore, provider: p, cfg: cfg, http: &http.Client{Timeout: 10 * time.Minute}}
+func New(db *gorm.DB, store storage.Store, p provider.Provider, cfg config.Config) *Engine {
+	return &Engine{db: db, store: store, provider: p, cfg: cfg, http: &http.Client{Timeout: 10 * time.Minute}}
 }
 
 func NewManaged(db *gorm.DB, manager *runtime.Manager, hub *events.Hub) *Engine {
@@ -123,12 +124,12 @@ func (e *Engine) dispatch(ctx context.Context) {
 		e.wg.Add(1)
 		go func() {
 			defer e.wg.Done()
-			worker := New(e.db, taskSnap.Store, taskSnap.TOS, taskSnap.Provider, taskSnap.Config)
+			worker := New(e.db, taskSnap.Store, taskSnap.Provider, taskSnap.Config)
 			worker.hub = e.hub
 			defer func() {
 				if recovered := recover(); recovered != nil {
 					worker.fail(&task, fmt.Errorf("任务执行异常，请检查服务日志"))
-					log.Printf("task %d panic: %v", task.ID, recovered)
+					log.Printf("task %d panic: %s", task.ID, worker.cfg.Redact(fmt.Sprint(recovered)))
 				}
 				if err := e.db.Model(&domain.GenerationTask{}).Where("id=?", task.ID).Update("lease_until", nil).Error; err != nil {
 					log.Printf("release task %d: %v", task.ID, err)
@@ -182,7 +183,12 @@ func (e *Engine) submit(ctx context.Context, task *domain.GenerationTask) {
 	e.hub.Notify(session.WorkspaceID)
 	result, err := e.provider.Submit(ctx, request)
 	if err != nil {
-		e.fail(task, fmt.Errorf("提交失败（请求中断时第三方可能已接收，请核实后再重试）: %w", err))
+		var rejected *provider.HTTPError
+		if errors.As(err, &rejected) {
+			e.fail(task, rejected)
+		} else {
+			e.fail(task, fmt.Errorf("提交失败（请求中断时第三方可能已接收，请核实后再重试）: %w", err))
+		}
 		return
 	}
 	e.applyResult(ctx, task, &session, result)
@@ -208,7 +214,7 @@ func (e *Engine) poll(ctx context.Context, task *domain.GenerationTask) {
 	result, err := e.provider.Poll(pollCtx, task.ExternalTaskID)
 	if err != nil {
 		next := time.Now().Add(10 * time.Second)
-		if err := e.db.Model(task).Updates(map[string]any{"next_poll_at": next, "error_message": err.Error()}).Error; err != nil {
+		if err := e.db.Model(task).Updates(map[string]any{"next_poll_at": next, "error_message": e.cfg.Redact(err.Error())}).Error; err != nil {
 			log.Printf("poll retry: %v", err)
 		}
 		e.hub.Notify(session.WorkspaceID)
@@ -244,16 +250,48 @@ func (e *Engine) buildRequest(ctx context.Context, session domain.GenerationSess
 		return provider.Request{}, err
 	}
 	inputs := make([]provider.Input, 0, len(rows))
+	var totalSize int64
 	for _, row := range rows {
 		var asset domain.Asset
 		if err := e.db.First(&asset, row.AssetID).Error; err != nil {
 			return provider.Request{}, err
 		}
-		url, err := e.store.PresignGet(ctx, asset.ObjectKey, e.cfg.TOS.PresignTTL)
-		if err != nil {
-			return provider.Request{}, err
+		if asset.StorageProvider != "local" {
+			return provider.Request{}, fmt.Errorf("素材 %d 使用旧版 TOS 存储，请重新上传后再生成", asset.ID)
 		}
-		inputs = append(inputs, provider.Input{Type: row.InputType, Role: row.InputRole, URL: url})
+		file, info, err := e.store.Open(ctx, asset.ObjectKey)
+		if err != nil {
+			return provider.Request{}, fmt.Errorf("读取本地素材 %d: %w", asset.ID, err)
+		}
+		if info.Size() > 50<<20 {
+			file.Close()
+			return provider.Request{}, fmt.Errorf("素材 %d 超过 Base64 输入的 50MB 限制", asset.ID)
+		}
+		totalSize += info.Size()
+		if totalSize > 50<<20 {
+			file.Close()
+			return provider.Request{}, fmt.Errorf("输入素材总大小超过 50MB 限制")
+		}
+		var encoded strings.Builder
+		encoded.Grow(base64.StdEncoding.EncodedLen(int(info.Size())))
+		encoder := base64.NewEncoder(base64.StdEncoding, &encoded)
+		readSize, readErr := io.Copy(encoder, file)
+		closeErr := encoder.Close()
+		file.Close()
+		if readErr != nil {
+			return provider.Request{}, fmt.Errorf("读取本地素材 %d: %w", asset.ID, readErr)
+		}
+		if closeErr != nil {
+			return provider.Request{}, fmt.Errorf("编码本地素材 %d: %w", asset.ID, closeErr)
+		}
+		if readSize != info.Size() {
+			return provider.Request{}, fmt.Errorf("本地素材 %d 在读取时发生变化，请重试", asset.ID)
+		}
+		mimeType := strings.TrimSpace(asset.ContentType)
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		inputs = append(inputs, provider.Input{Type: row.InputType, Role: row.InputRole, MIME: mimeType, DataURI: "data:" + mimeType + ";base64," + encoded.String()})
 	}
 	return provider.Request{TaskType: session.TaskType, Model: session.ModelKey, Prompt: session.Prompt, Params: params, Inputs: inputs}, nil
 }
@@ -377,21 +415,21 @@ func (e *Engine) persistResult(ctx context.Context, session domain.GenerationSes
 		}
 	}
 	ext := extension(mimeType, session.TaskType)
-	key := e.tos.Key("generated", fmt.Sprint(session.WorkspaceID), fmt.Sprint(session.ID), "result"+ext)
+	key := e.store.Key("generated", fmt.Sprint(session.WorkspaceID), fmt.Sprint(session.ID), "result"+ext)
 	put, err := e.store.Put(ctx, key, mimeType, size, body)
 	if err != nil {
 		return domain.Asset{}, err
 	}
-	return domain.Asset{WorkspaceID: session.WorkspaceID, AssetType: session.TaskType, StorageProvider: "tos", Bucket: e.tos.Bucket(), ObjectKey: key, ContentType: mimeType, Size: size, ETag: put.ETag, Source: "generated"}, nil
+	return domain.Asset{WorkspaceID: session.WorkspaceID, AssetType: session.TaskType, StorageProvider: "local", ObjectKey: key, ContentType: mimeType, Size: size, ETag: put.ETag, Source: "generated"}, nil
 }
 
 func (e *Engine) fail(task *domain.GenerationTask, failure error) {
 	now := time.Now()
 	err := e.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(task).Updates(map[string]any{"status": domain.StatusFailed, "error_message": failure.Error(), "next_poll_at": nil}).Error; err != nil {
+		if err := tx.Model(task).Updates(map[string]any{"status": domain.StatusFailed, "error_message": e.cfg.Redact(failure.Error()), "next_poll_at": nil}).Error; err != nil {
 			return err
 		}
-		return tx.Model(&domain.GenerationSession{}).Where("id=?", task.SessionID).Updates(map[string]any{"status": domain.StatusFailed, "error_message": failure.Error(), "finished_at": now}).Error
+		return tx.Model(&domain.GenerationSession{}).Where("id=?", task.SessionID).Updates(map[string]any{"status": domain.StatusFailed, "error_message": e.cfg.Redact(failure.Error()), "finished_at": now}).Error
 	})
 	if err != nil {
 		log.Printf("fail task %d: %v", task.ID, err)
@@ -403,7 +441,14 @@ func (e *Engine) fail(task *domain.GenerationTask, failure error) {
 }
 
 func extension(contentType, taskType string) string {
-	if values, _ := mime.ExtensionsByType(strings.Split(contentType, ";")[0]); len(values) > 0 {
+	mediaType := strings.Split(contentType, ";")[0]
+	if known := map[string]string{
+		"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
+		"image/gif": ".gif", "video/mp4": ".mp4", "video/webm": ".webm",
+	}[mediaType]; known != "" {
+		return known
+	}
+	if values, _ := mime.ExtensionsByType(mediaType); len(values) > 0 {
 		return values[0]
 	}
 	if taskType == "image" {

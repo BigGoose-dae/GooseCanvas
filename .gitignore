@@ -9,3 +9,16 @@ bin/
 .DS_Store
 .idea/
 .vscode/
+
+# Local configuration, credentials, and database backups
+.env.*
+!.env.example
+.settings.key
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.pem
+*.key

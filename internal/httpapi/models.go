@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
+	"github.com/gin-gonic/gin"
 )
 
 type modelView struct {
@@ -48,7 +48,7 @@ func (a *API) models(c *gin.Context) {
 	}
 	var rows []domain.ModelDefinition
 	if err := query.Order("enabled desc, builtin desc, id asc").Find(&rows).Error; err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	items := make([]modelView, 0, len(rows))
@@ -61,16 +61,16 @@ func (a *API) models(c *gin.Context) {
 func (a *API) createModel(c *gin.Context) {
 	var req modelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	row, err := modelFromRequest(req)
 	if err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	if err := a.DB.Create(&row).Error; err != nil {
-		fail(c, 409, fmt.Errorf("模型 Key 已存在或数据无效: %w", err))
+		a.fail(c, 409, fmt.Errorf("模型 Key 已存在或数据无效: %w", err))
 		return
 	}
 	c.JSON(http.StatusCreated, toModelView(row))
@@ -83,18 +83,18 @@ func (a *API) updateModel(c *gin.Context) {
 	}
 	var current domain.ModelDefinition
 	if err := a.DB.Where("id=? AND deleted_at IS NULL", id).First(&current).Error; err != nil {
-		fail(c, 404, fmt.Errorf("模型不存在"))
+		a.fail(c, 404, fmt.Errorf("模型不存在"))
 		return
 	}
 	var req modelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	req.Key = current.ModelKey
 	row, err := modelFromRequest(req)
 	if err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	updates := map[string]any{
@@ -103,11 +103,11 @@ func (a *API) updateModel(c *gin.Context) {
 		"defaults": row.Defaults, "options": row.Options, "enabled": row.Enabled,
 	}
 	if err := a.DB.Model(&current).Updates(updates).Error; err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	if err := a.DB.First(&current, id).Error; err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(http.StatusOK, toModelView(current))
@@ -121,11 +121,11 @@ func (a *API) deleteModel(c *gin.Context) {
 	now := time.Now()
 	result := a.DB.Model(&domain.ModelDefinition{}).Where("id=? AND deleted_at IS NULL", id).Update("deleted_at", now)
 	if result.Error != nil {
-		fail(c, 500, result.Error)
+		a.fail(c, 500, result.Error)
 		return
 	}
 	if result.RowsAffected == 0 {
-		fail(c, 404, fmt.Errorf("模型不存在"))
+		a.fail(c, 404, fmt.Errorf("模型不存在"))
 		return
 	}
 	c.Status(http.StatusNoContent)

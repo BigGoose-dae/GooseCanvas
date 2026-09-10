@@ -6,15 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/BigGoose-dae/GooseCanvas/internal/config"
-	"github.com/BigGoose-dae/GooseCanvas/internal/storage"
+	"github.com/gin-gonic/gin"
 )
 
-func TestStatusHandlesTypedNilStore(t *testing.T) {
+func TestStatusHandlesMissingStore(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	var typedNil *storage.TOSStore
-	api := &API{Config: config.Config{}, Store: typedNil, TOS: typedNil}
+	api := &API{Config: config.Config{}}
 	router := gin.New()
 	router.GET("/status", api.status)
 
@@ -32,7 +30,7 @@ func TestStatusHandlesTypedNilStore(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Ready || body.Storage.Status != "not_configured" {
+	if body.Ready || body.Storage.Status != "error" {
 		t.Fatalf("unexpected response: %s", response.Body.String())
 	}
 }

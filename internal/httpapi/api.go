@@ -3,8 +3,11 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -12,30 +15,39 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/BigGoose-dae/GooseCanvas/internal/config"
 	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
 	"github.com/BigGoose-dae/GooseCanvas/internal/events"
 	"github.com/BigGoose-dae/GooseCanvas/internal/provider"
 	"github.com/BigGoose-dae/GooseCanvas/internal/runtime"
 	"github.com/BigGoose-dae/GooseCanvas/internal/storage"
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type API struct {
-	DB           *gorm.DB
-	Runtime      *runtime.Manager
-	Events       *events.Hub
-	Config       config.Config
-	Store        storage.Store
-	TOS          *storage.TOSStore
-	Volc         *provider.Volcengine
-	StorageError error
+	DB      *gorm.DB
+	Runtime *runtime.Manager
+	Events  *events.Hub
+	Config  config.Config
+	Store   storage.Store
+	Volc    *provider.Volcengine
 }
 
 func (a *API) Register(r *gin.Engine) {
 	v1 := r.Group("/api/v1")
 	v1.Use(func(c *gin.Context) {
+		bindHost, _, _ := net.SplitHostPort(a.current().Config.Addr)
+		if bindHost == "localhost" || net.ParseIP(bindHost).IsLoopback() {
+			requestHost := c.Request.Host
+			if host, _, err := net.SplitHostPort(requestHost); err == nil {
+				requestHost = host
+			}
+			if requestHost != "localhost" && !net.ParseIP(requestHost).IsLoopback() {
+				c.AbortWithStatusJSON(403, gin.H{"error": "本机模式只接受本机地址访问"})
+				return
+			}
+		}
 		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead && c.Request.Method != http.MethodOptions {
 			if origin := c.GetHeader("Origin"); origin != "" {
 				parsed, err := url.Parse(origin)
@@ -52,7 +64,6 @@ func (a *API) Register(r *gin.Engine) {
 	v1.GET("/system/status", a.status)
 	v1.GET("/settings", a.getSettings)
 	v1.PUT("/settings", a.saveSettings)
-	v1.POST("/settings/test", a.testSettings)
 	v1.GET("/workspaces/:id/events", a.stream)
 	v1.GET("/workspaces/:id/tasks", a.listTasks)
 	v1.POST("/nodes/:id/duplicate", a.duplicateNode)
@@ -82,25 +93,23 @@ func (a *API) Register(r *gin.Engine) {
 func (a *API) status(c *gin.Context) {
 	a = a.current()
 	missing := a.Config.Missing()
-	storageStatus := "not_configured"
+	storageStatus := "error"
 	storageMessage := ""
-	if a.Store != nil && a.TOS != nil {
+	if a.Store != nil {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Second)
 		defer cancel()
 		if err := a.Store.Ready(ctx); err != nil {
 			storageStatus = "error"
-			storageMessage = err.Error()
+			storageMessage = a.Config.Redact(err.Error())
 		} else {
 			storageStatus = "ok"
 		}
-	} else if a.StorageError != nil {
-		storageMessage = a.StorageError.Error()
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"ready":    len(missing) == 0 && storageStatus == "ok",
 		"app":      gin.H{"name": a.Config.AppName, "logoUrl": a.Config.LogoURL, "repositoryUrl": a.Config.RepoURL},
 		"database": gin.H{"status": "ok", "driver": "sqlite"},
-		"storage":  gin.H{"status": storageStatus, "provider": "tos", "bucket": a.Config.TOS.Bucket, "message": storageMessage},
+		"storage":  gin.H{"status": storageStatus, "provider": "local", "message": storageMessage},
 		"model":    gin.H{"status": map[bool]string{true: "configured", false: "not_configured"}[a.Config.Volc.APIKey != ""], "provider": "volcengine"},
 		"missing":  missing,
 	})
@@ -109,7 +118,7 @@ func (a *API) status(c *gin.Context) {
 func (a *API) listWorkspaces(c *gin.Context) {
 	var items []domain.Workspace
 	if err := a.DB.Where("deleted_at IS NULL").Order("updated_at desc").Find(&items).Error; err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(http.StatusOK, items)
@@ -123,17 +132,17 @@ type workspaceRequest struct {
 func (a *API) createWorkspace(c *gin.Context) {
 	var req workspaceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		fail(c, 400, fmt.Errorf("项目名称不能为空"))
+		a.fail(c, 400, fmt.Errorf("项目名称不能为空"))
 		return
 	}
 	item := domain.Workspace{Name: req.Name, Description: strings.TrimSpace(req.Description)}
 	if err := a.DB.Create(&item).Error; err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(http.StatusCreated, item)
@@ -145,7 +154,7 @@ func (a *API) updateWorkspace(c *gin.Context) {
 	}
 	var req workspaceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	updates := map[string]any{"updated_at": time.Now()}
@@ -154,7 +163,7 @@ func (a *API) updateWorkspace(c *gin.Context) {
 	}
 	updates["description"] = strings.TrimSpace(req.Description)
 	if a.DB.Model(&domain.Workspace{}).Where("id=? AND deleted_at IS NULL", id).Updates(updates).RowsAffected == 0 {
-		fail(c, 404, fmt.Errorf("项目不存在"))
+		a.fail(c, 404, fmt.Errorf("项目不存在"))
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -174,7 +183,7 @@ func (a *API) deleteWorkspace(c *gin.Context) {
 		}
 		return tx.Model(&domain.Workspace{}).Where("id=?", id).Update("deleted_at", now).Error
 	}); err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -197,7 +206,7 @@ func (a *API) graph(c *gin.Context) {
 	}
 	var ws domain.Workspace
 	if err := a.DB.Where("id=? AND deleted_at IS NULL", wid).First(&ws).Error; err != nil {
-		fail(c, 404, fmt.Errorf("项目不存在"))
+		a.fail(c, 404, fmt.Errorf("项目不存在"))
 		return
 	}
 	var nodes []domain.Node
@@ -241,12 +250,12 @@ func (a *API) createNode(c *gin.Context) {
 	}
 	var req nodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	typeName := strings.ToLower(strings.TrimSpace(req.NodeType))
 	if typeName != "text" && typeName != "image" && typeName != "video" {
-		fail(c, 400, fmt.Errorf("节点类型仅支持 text/image/video"))
+		a.fail(c, 400, fmt.Errorf("节点类型仅支持 text/image/video"))
 		return
 	}
 	if req.Params == nil {
@@ -255,13 +264,13 @@ func (a *API) createNode(c *gin.Context) {
 	params, _ := json.Marshal(req.Params)
 	var workspace domain.Workspace
 	if err := a.DB.Where("id=? AND deleted_at IS NULL", wid).First(&workspace).Error; err != nil {
-		fail(c, 404, fmt.Errorf("项目不存在"))
+		a.fail(c, 404, fmt.Errorf("项目不存在"))
 		return
 	}
 	if req.AssetID != nil {
 		var asset domain.Asset
 		if err := a.DB.Where("id=? AND workspace_id=? AND asset_type=? AND deleted_at IS NULL", *req.AssetID, wid, typeName).First(&asset).Error; err != nil {
-			fail(c, 400, fmt.Errorf("素材不存在或不属于当前项目/节点类型"))
+			a.fail(c, 400, fmt.Errorf("素材不存在或不属于当前项目/节点类型"))
 			return
 		}
 	}
@@ -275,7 +284,7 @@ func (a *API) createNode(c *gin.Context) {
 		}
 		return tx.Create(&domain.NodeVersion{NodeID: node.ID, Version: 1, AssetID: req.AssetID, Prompt: node.Prompt, ModelKey: node.ModelKey, Params: node.Params}).Error
 	}); err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(http.StatusCreated, node)
@@ -287,7 +296,7 @@ func (a *API) updateNode(c *gin.Context) {
 	}
 	var req nodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	if req.Params == nil {
@@ -307,7 +316,7 @@ func (a *API) updateNode(c *gin.Context) {
 		return tx.Model(&domain.Workspace{}).Where("id=?", node.WorkspaceID).Update("updated_at", time.Now()).Error
 	})
 	if err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -337,28 +346,28 @@ func (a *API) createEdge(c *gin.Context) {
 	}
 	var req edgeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	if req.FromNodeID == 0 || req.ToNodeID == 0 || req.FromNodeID == req.ToNodeID {
-		fail(c, 400, fmt.Errorf("无效连接"))
+		a.fail(c, 400, fmt.Errorf("无效连接"))
 		return
 	}
 	var nodeCount int64
 	a.DB.Model(&domain.Node{}).Where("workspace_id=? AND id IN ? AND deleted_at IS NULL", wid, []uint64{req.FromNodeID, req.ToNodeID}).Count(&nodeCount)
 	if nodeCount != 2 {
-		fail(c, 400, fmt.Errorf("连接节点不属于当前项目或已被删除"))
+		a.fail(c, 400, fmt.Errorf("连接节点不属于当前项目或已被删除"))
 		return
 	}
 	var count int64
 	a.DB.Model(&domain.Edge{}).Where("workspace_id=? AND from_node_id=? AND to_node_id=? AND deleted_at IS NULL", wid, req.FromNodeID, req.ToNodeID).Count(&count)
 	if count > 0 {
-		fail(c, 409, fmt.Errorf("连接已存在"))
+		a.fail(c, 409, fmt.Errorf("连接已存在"))
 		return
 	}
 	item := domain.Edge{WorkspaceID: wid, FromNodeID: req.FromNodeID, ToNodeID: req.ToNodeID}
 	if err := a.DB.Create(&item).Error; err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(201, item)
@@ -375,47 +384,68 @@ func (a *API) deleteEdge(c *gin.Context) {
 
 func (a *API) uploadAsset(c *gin.Context) {
 	a = a.current()
-	if a.Store == nil || a.TOS == nil {
-		fail(c, 503, fmt.Errorf("TOS 未配置"))
+	if a.Store == nil {
+		a.fail(c, 503, fmt.Errorf("本地素材目录不可用"))
 		return
 	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 51<<20)
+	if err := c.Request.ParseMultipartForm(1 << 20); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			a.fail(c, 413, fmt.Errorf("文件不能超过 50MB，以免 Base64 请求过大"))
+		} else {
+			a.fail(c, 400, fmt.Errorf("读取上传文件失败: %w", err))
+		}
+		return
+	}
+	defer c.Request.MultipartForm.RemoveAll()
 	wid, err := strconv.ParseUint(c.PostForm("workspaceId"), 10, 64)
 	if err != nil || wid == 0 {
-		fail(c, 400, fmt.Errorf("workspaceId 无效"))
+		a.fail(c, 400, fmt.Errorf("workspaceId 无效"))
 		return
 	}
 	var workspaceCount int64
 	a.DB.Model(&domain.Workspace{}).Where("id=? AND deleted_at IS NULL", wid).Count(&workspaceCount)
 	if workspaceCount == 0 {
-		fail(c, 404, fmt.Errorf("项目不存在"))
+		a.fail(c, 404, fmt.Errorf("项目不存在"))
 		return
 	}
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	defer file.Close()
-	if header.Size > 500<<20 {
-		fail(c, 413, fmt.Errorf("文件不能超过 500MB"))
+	if header.Size > 50<<20 {
+		a.fail(c, 413, fmt.Errorf("文件不能超过 50MB，以免 Base64 请求过大"))
 		return
 	}
-	contentType := header.Header.Get("Content-Type")
+	probe := make([]byte, 512)
+	n, readErr := file.Read(probe)
+	if readErr != nil && readErr != io.EOF {
+		a.fail(c, 400, readErr)
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		a.fail(c, 500, err)
+		return
+	}
+	contentType := http.DetectContentType(probe[:n])
 	kind := assetKind(contentType)
 	if kind == "" {
-		fail(c, 400, fmt.Errorf("仅支持图片和视频"))
+		a.fail(c, 400, fmt.Errorf("仅支持图片和视频"))
 		return
 	}
-	key := a.TOS.Key("uploads", fmt.Sprint(wid), time.Now().Format("20060102"), fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExt(header)))
+	key := a.Store.Key("uploads", fmt.Sprint(wid), time.Now().Format("20060102"), fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExt(header)))
 	put, err := a.Store.Put(c.Request.Context(), key, contentType, header.Size, file)
 	if err != nil {
-		fail(c, 502, err)
+		a.fail(c, 502, err)
 		return
 	}
-	asset := domain.Asset{WorkspaceID: wid, AssetType: kind, StorageProvider: "tos", Bucket: a.TOS.Bucket(), ObjectKey: key, ContentType: contentType, Size: header.Size, ETag: put.ETag, Source: "upload"}
+	asset := domain.Asset{WorkspaceID: wid, AssetType: kind, StorageProvider: "local", ObjectKey: key, ContentType: contentType, Size: header.Size, ETag: put.ETag, Source: "upload"}
 	if err := a.DB.Create(&asset).Error; err != nil {
 		_ = a.Store.Delete(c.Request.Context(), key)
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(201, assetView{Asset: asset, URL: fmt.Sprintf("/api/v1/assets/%d/content", asset.ID)})
@@ -428,25 +458,31 @@ func (a *API) assetContent(c *gin.Context) {
 	}
 	view, err := a.loadAsset(c.Request.Context(), id)
 	if err != nil {
-		fail(c, 404, err)
+		a.fail(c, 404, err)
 		return
 	}
-	url, err := a.current().Store.PresignGet(c.Request.Context(), view.ObjectKey, 30*time.Minute)
+	file, info, err := a.current().Store.Open(c.Request.Context(), view.ObjectKey)
 	if err != nil {
-		fail(c, 502, err)
+		a.fail(c, 404, err)
 		return
 	}
+	defer file.Close()
 	c.Header("Cache-Control", "no-store")
-	c.Redirect(http.StatusTemporaryRedirect, url)
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Content-Type", view.ContentType)
+	http.ServeContent(c.Writer, c.Request, filepath.Base(view.ObjectKey), info.ModTime(), file)
 }
-func (a *API) loadAsset(ctx context.Context, id uint64) (assetView, error) {
+func (a *API) loadAsset(_ context.Context, id uint64) (assetView, error) {
 	a = a.current()
 	var asset domain.Asset
 	if err := a.DB.Where("id=? AND deleted_at IS NULL", id).First(&asset).Error; err != nil {
 		return assetView{}, err
 	}
-	if a.Store == nil || a.TOS == nil {
-		return assetView{}, fmt.Errorf("TOS 未配置")
+	if a.Store == nil {
+		return assetView{}, fmt.Errorf("本地素材目录不可用")
+	}
+	if asset.StorageProvider != "local" {
+		return assetView{}, fmt.Errorf("该素材使用旧版 TOS 存储，请重新上传")
 	}
 	return assetView{Asset: asset, URL: fmt.Sprintf("/api/v1/assets/%d/content", asset.ID)}, nil
 }
@@ -466,24 +502,24 @@ func (a *API) runNode(c *gin.Context) {
 	}
 	var req runRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	var node domain.Node
 	if err := a.DB.Where("id=? AND deleted_at IS NULL", nid).First(&node).Error; err != nil {
-		fail(c, 404, fmt.Errorf("节点不存在"))
+		a.fail(c, 404, fmt.Errorf("节点不存在"))
 		return
 	}
 	if node.NodeType != "image" && node.NodeType != "video" {
-		fail(c, 400, fmt.Errorf("仅图片和视频节点可运行"))
+		a.fail(c, 400, fmt.Errorf("仅图片和视频节点可运行"))
 		return
 	}
-	if a.Store == nil || len(a.Config.StorageMissing()) > 0 {
-		fail(c, 503, fmt.Errorf("TOS 未配置，无法生成内容"))
+	if a.Store == nil {
+		a.fail(c, 503, fmt.Errorf("本地素材目录不可用，无法生成内容"))
 		return
 	}
 	if len(a.Config.ModelMissing()) > 0 {
-		fail(c, 503, fmt.Errorf("VOLCENGINE_API_KEY 未配置，无法生成内容"))
+		a.fail(c, 503, fmt.Errorf("VOLCENGINE_API_KEY 未配置，无法生成内容"))
 		return
 	}
 	if req.Params == nil {
@@ -495,11 +531,11 @@ func (a *API) runNode(c *gin.Context) {
 		modelQuery = modelQuery.Where("model_key=?", strings.TrimSpace(req.ModelKey))
 	}
 	if err := modelQuery.Order("builtin desc, id asc").First(&model).Error; err != nil {
-		fail(c, 400, fmt.Errorf("没有找到可用的%s模型，请先在模型管理中添加并启用", map[string]string{"image": "图片", "video": "视频"}[node.NodeType]))
+		a.fail(c, 400, fmt.Errorf("没有找到可用的%s模型，请先在模型管理中添加并启用", map[string]string{"image": "图片", "video": "视频"}[node.NodeType]))
 		return
 	}
 	if model.Provider != "volcengine" {
-		fail(c, 400, fmt.Errorf("当前版本尚未安装模型供应商 %s 的适配器", model.Provider))
+		a.fail(c, 400, fmt.Errorf("当前版本尚未安装模型供应商 %s 的适配器", model.Provider))
 		return
 	}
 	defaults := map[string]any{}
@@ -555,7 +591,7 @@ func (a *API) runNode(c *gin.Context) {
 		return tx.Model(&node).Updates(map[string]any{"prompt": req.Prompt, "model_key": model.ModelKey, "params": string(params)}).Error
 	})
 	if err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	a.Events.Notify(session.WorkspaceID)
@@ -569,7 +605,7 @@ func (a *API) generation(c *gin.Context) {
 	}
 	var session domain.GenerationSession
 	if err := a.DB.First(&session, id).Error; err != nil {
-		fail(c, 404, fmt.Errorf("任务不存在"))
+		a.fail(c, 404, fmt.Errorf("任务不存在"))
 		return
 	}
 	response := gin.H{"session": session}

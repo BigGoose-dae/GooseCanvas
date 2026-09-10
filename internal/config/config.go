@@ -18,23 +18,12 @@ type Config struct {
 	DataDir  string
 	Database string
 	Volc     Volcengine
-	TOS      TOS
 	Worker   Worker
 }
 
 type Volcengine struct {
 	APIKey  string
 	BaseURL string
-}
-
-type TOS struct {
-	Endpoint   string
-	Region     string
-	Bucket     string
-	AccessKey  string
-	SecretKey  string
-	Prefix     string
-	PresignTTL time.Duration
 }
 
 type Worker struct {
@@ -45,11 +34,10 @@ type Worker struct {
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
-	dataDir := env("DATA_DIR", "./data")
-	presignTTL, err := duration("TOS_PRESIGN_TTL", 24*time.Hour)
-	if err != nil {
+	if err := os.Chmod(".env", 0o600); err != nil && !os.IsNotExist(err) {
 		return Config{}, err
 	}
+	dataDir := env("DATA_DIR", "./data")
 	pollInterval, err := duration("WORKER_POLL_INTERVAL", 3*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -70,15 +58,6 @@ func Load() (Config, error) {
 			APIKey:  strings.TrimSpace(os.Getenv("VOLCENGINE_API_KEY")),
 			BaseURL: strings.TrimRight(env("VOLCENGINE_BASE_URL", "https://ark.cn-beijing.volces.com"), "/"),
 		},
-		TOS: TOS{
-			Endpoint:   env("TOS_ENDPOINT", "https://tos-cn-beijing.volces.com"),
-			Region:     env("TOS_REGION", "cn-beijing"),
-			Bucket:     strings.TrimSpace(os.Getenv("TOS_BUCKET")),
-			AccessKey:  strings.TrimSpace(os.Getenv("TOS_ACCESS_KEY")),
-			SecretKey:  strings.TrimSpace(os.Getenv("TOS_SECRET_KEY")),
-			Prefix:     strings.Trim(env("TOS_PREFIX", "goose-canvas"), "/"),
-			PresignTTL: presignTTL,
-		},
 		Worker: Worker{PollInterval: pollInterval, TaskTimeout: taskTimeout, Concurrency: 4},
 	}
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
@@ -88,7 +67,7 @@ func Load() (Config, error) {
 }
 
 func (c Config) Missing() []string {
-	return append(c.ModelMissing(), c.StorageMissing()...)
+	return c.ModelMissing()
 }
 
 func (c Config) ModelMissing() []string {
@@ -96,24 +75,6 @@ func (c Config) ModelMissing() []string {
 		return []string{"VOLCENGINE_API_KEY"}
 	}
 	return nil
-}
-
-func (c Config) StorageMissing() []string {
-	checks := []struct {
-		key   string
-		value string
-	}{
-		{"TOS_BUCKET", c.TOS.Bucket},
-		{"TOS_ACCESS_KEY", c.TOS.AccessKey},
-		{"TOS_SECRET_KEY", c.TOS.SecretKey},
-	}
-	result := make([]string, 0, len(checks))
-	for _, check := range checks {
-		if strings.TrimSpace(check.value) == "" {
-			result = append(result, check.key)
-		}
-	}
-	return result
 }
 
 func env(key, fallback string) string {
@@ -133,4 +94,14 @@ func duration(key string, fallback time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid %s: must be a positive duration", key)
 	}
 	return value, nil
+}
+
+// Redact keeps configured credentials out of user-facing errors and logs.
+func (c Config) Redact(message string) string {
+	for _, secret := range []string{c.Volc.APIKey} {
+		if secret != "" {
+			message = strings.ReplaceAll(message, secret, "[REDACTED]")
+		}
+	}
+	return message
 }

@@ -112,8 +112,8 @@ type GenerationTask struct {
 	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
-// ModelDefinition is user-managed model metadata. Credentials deliberately do
-// not live here: provider secrets stay in the process environment.
+// ModelDefinition is user-managed model metadata. Provider credentials are
+// stored separately in encrypted system settings or supplied at process startup.
 type ModelDefinition struct {
 	ID          uint64     `gorm:"primaryKey" json:"id"`
 	ModelKey    string     `gorm:"size:160;uniqueIndex;not null" json:"key"`

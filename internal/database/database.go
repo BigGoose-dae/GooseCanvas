@@ -39,9 +39,10 @@ func Open(path string) (*gorm.DB, error) {
 		SlowThreshold:             time.Second,
 		LogLevel:                  logger.Error,
 		IgnoreRecordNotFoundError: true,
+		ParameterizedQueries:      true,
 		Colorful:                  true,
 	})
-	db, err := gorm.Open(sqlite.Open(path+"?_busy_timeout=5000&_journal_mode=WAL&_foreign_keys=on&_txlock=immediate"), &gorm.Config{Logger: dbLogger})
+	db, err := gorm.Open(sqlite.Open(path+"?_busy_timeout=5000&_journal_mode=WAL&_foreign_keys=on&_txlock=immediate&_secure_delete=on"), &gorm.Config{Logger: dbLogger})
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}

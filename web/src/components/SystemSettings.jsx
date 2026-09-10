@@ -14,7 +14,7 @@ export default function SystemSettings() {
     api
       .settings()
       .then((data) =>
-        setForm({ ...data, apiKey: "", accessKey: "", secretKey: "" }),
+        setForm({ ...data, apiKey: "" }),
       )
       .catch((err) => setError(err.message));
   }, []);
@@ -29,20 +29,8 @@ export default function SystemSettings() {
     setSaved("");
     try {
       const data = await api.saveSettings(form);
-      setForm({ ...data, apiKey: "", accessKey: "", secretKey: "" });
+      setForm({ ...data, apiKey: "" });
       setSaved("设置已保存并生效，无需重启。");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const test = async () => {
-    setBusy(true);
-    setError("");
-    setSaved("");
-    try {
-      setSaved((await api.testSettings()).message);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -84,9 +72,9 @@ export default function SystemSettings() {
         <div className="settings-intro">
           <small>YOUR CREATIVE WORKSPACE</small>
           <h1>创作设置</h1>
-          <p>连接生成模型和素材存储，让画布准备就绪。</p>
+          <p>连接生成模型，上传素材与生成结果会自动保存在本机。</p>
           <p>
-            设置保存在本机，密钥不会回显到页面。首次配置时，填写两个服务的凭证即可。
+            设置保存在本机，密钥不会回显到页面。首次使用只需填写方舟 API Key。
           </p>
         </div>
         {error && (
@@ -134,50 +122,12 @@ export default function SystemSettings() {
               <legend>
                 <b>03</b> 素材存储
               </legend>
-              <p>上传素材与生成结果保存在你的 TOS 存储桶中。</p>
-              <div className="settings-grid">
-                <label>
-                  存储桶名称
-                  <input
-                    value={form.bucket}
-                    onChange={(event) => change("bucket", event.target.value)}
-                    placeholder="例如 my-creative-assets"
-                  />
-                </label>
-                <label>
-                  区域
-                  <input
-                    required
-                    value={form.region}
-                    onChange={(event) => change("region", event.target.value)}
-                    placeholder="cn-beijing"
-                  />
-                </label>
-              </div>
-              {secret("accessKey", "TOS Access Key")}
-              {secret("secretKey", "TOS Secret Key")}
-              <details>
-                <summary>高级存储设置</summary>
-                <label>
-                  存储服务地址
-                  <input
-                    required
-                    type="url"
-                    value={form.endpoint}
-                    onChange={(event) => change("endpoint", event.target.value)}
-                  />
-                </label>
-                <label>
-                  素材目录前缀
-                  <input
-                    value={form.prefix}
-                    onChange={(event) => change("prefix", event.target.value)}
-                  />
-                </label>
-              </details>
-              <small>
-                已有素材后保留原存储桶与区域，避免旧素材失联；访问凭证仍可更新。
-              </small>
+              <p>文件上传后保存在本地，调用模型时由 Go 服务编码为 Base64。</p>
+              <label>
+                本地素材目录
+                <input readOnly value={form.assetDirectory} />
+                <small>模型返回临时下载地址时，结果也会立即归档到此目录。</small>
+              </label>
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
@@ -220,9 +170,6 @@ export default function SystemSettings() {
               </p>
             )}
             <div className="settings-savebar">
-              <button type="button" disabled={busy} onClick={test}>
-                测试已保存的存储连接
-              </button>
               <button className="primary" type="submit" disabled={busy}>
                 {busy ? "处理中…" : "保存设置"}
               </button>

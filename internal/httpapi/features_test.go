@@ -7,17 +7,18 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/BigGoose-dae/GooseCanvas/internal/config"
 	"github.com/BigGoose-dae/GooseCanvas/internal/database"
 	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
 	"github.com/BigGoose-dae/GooseCanvas/internal/events"
 	"github.com/BigGoose-dae/GooseCanvas/internal/runtime"
+	"github.com/gin-gonic/gin"
 )
 
 func featureAPI(t *testing.T) (*API, *gin.Engine) {
@@ -29,7 +30,7 @@ func featureAPI(t *testing.T) (*API, *gin.Engine) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { sql, _ := db.DB(); sql.Close() })
-	cfg := config.Config{AppName: "Test", DataDir: dir, Volc: config.Volcengine{BaseURL: "https://ark.example.invalid"}, TOS: config.TOS{Endpoint: "https://tos-cn-beijing.volces.com", Region: "cn-beijing", Prefix: "test"}, Worker: config.Worker{Concurrency: 4, PollInterval: time.Second, TaskTimeout: 30 * time.Minute}}
+	cfg := config.Config{AppName: "Test", DataDir: dir, Volc: config.Volcengine{BaseURL: "https://ark.example.invalid"}, Worker: config.Worker{Concurrency: 4, PollInterval: time.Second, TaskTimeout: 30 * time.Minute}}
 	manager, err := runtime.New(db, cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -53,20 +54,23 @@ func jsonCall(t *testing.T, r http.Handler, method, path string, body any) *http
 
 func TestSettingsPersistWithoutReturningSecrets(t *testing.T) {
 	a, r := featureAPI(t)
-	body := settingsRequest{AppName: "Friendly Canvas", BaseURL: "https://ark.example.invalid", APIKey: "private-api-key", Endpoint: "https://tos-cn-beijing.volces.com", Region: "cn-beijing", Bucket: "test", AccessKey: "private-access", SecretKey: "private-secret", Concurrency: 6, TimeoutMinutes: 45}
+	body := settingsRequest{AppName: "Friendly Canvas", BaseURL: "https://ark.example.invalid", APIKey: "private-api-key", Concurrency: 6, TimeoutMinutes: 45}
 	response := jsonCall(t, r, "PUT", "/api/v1/settings", body)
 	if response.Code != 200 {
 		t.Fatalf("settings: %d %s", response.Code, response.Body.String())
 	}
+	var stored domain.SystemSetting
+	a.DB.First(&stored, 1)
+	if !strings.HasPrefix(stored.Value, "aesgcm:v1:") || strings.Contains(stored.Value, "private-api-key") {
+		t.Fatal("configuration stored without encryption")
+	}
 	body.APIKey = ""
-	body.AccessKey = ""
-	body.SecretKey = ""
 	body.Concurrency = 3
 	if result := jsonCall(t, r, "PUT", "/api/v1/settings", body); result.Code != 200 {
 		t.Fatal(result.Body.String())
 	}
 	read := jsonCall(t, r, "GET", "/api/v1/settings", nil)
-	for _, secret := range []string{"private-api-key", "private-access", "private-secret"} {
+	for _, secret := range []string{"private-api-key"} {
 		if strings.Contains(read.Body.String(), secret) {
 			t.Fatal("secret leaked in settings response")
 		}
@@ -76,7 +80,7 @@ func TestSettingsPersistWithoutReturningSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := restarted.Snapshot().Config
-	if cfg.Volc.APIKey != "private-api-key" || cfg.TOS.SecretKey != "private-secret" || cfg.Worker.Concurrency != 3 {
+	if cfg.Volc.APIKey != "private-api-key" || cfg.Worker.Concurrency != 3 {
 		t.Fatal("settings or retained secrets lost on restart")
 	}
 	body.Concurrency = 0
@@ -210,5 +214,58 @@ func TestSSEInitialSnapshotUpdatesAndReconnect(t *testing.T) {
 	defer closeStream()
 	if update := read(scanner); !strings.Contains(update, `"status":"succeeded"`) {
 		t.Fatal("reconnect did not recover latest state")
+	}
+}
+
+func TestLocalHostAndOriginProtection(t *testing.T) {
+	a, r := featureAPI(t)
+	if err := a.Runtime.Update(func(cfg *config.Config) error { cfg.Addr = "127.0.0.1:8080"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	for _, sample := range []struct {
+		host, origin string
+		want         int
+	}{
+		{"evil.example:8080", "http://evil.example:8080", 403},
+		{"localhost:8080", "https://evil.example", 403},
+		{"127.0.0.1:8080", "http://localhost:5173", 201},
+	} {
+		req := httptest.NewRequest("POST", "http://"+sample.host+"/api/v1/workspaces", strings.NewReader(`{"name":"safe test"}`))
+		req.Header.Set("Origin", sample.origin)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != sample.want {
+			t.Fatalf("host/origin protection: got %d want %d", rec.Code, sample.want)
+		}
+	}
+}
+
+func TestLegacySettingsMigrateToEncryptedRecord(t *testing.T) {
+	a, _ := featureAPI(t)
+	cfg := a.Runtime.Snapshot().Config
+	cfg.Volc.APIKey = "legacy-fixture-value"
+	raw, _ := json.Marshal(cfg)
+	if err := a.DB.Save(&domain.SystemSetting{ID: 1, Value: string(raw)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	manager, err := runtime.New(a.DB, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manager.Snapshot().Config.Volc.APIKey != cfg.Volc.APIKey {
+		t.Fatal("migration lost credential")
+	}
+	var stored domain.SystemSetting
+	a.DB.First(&stored, 1)
+	if !strings.HasPrefix(stored.Value, "aesgcm:v1:") || strings.Contains(stored.Value, cfg.Volc.APIKey) {
+		t.Fatal("legacy record was not encrypted")
+	}
+	contents, err := os.ReadFile(filepath.Join(cfg.DataDir, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(contents, []byte(cfg.Volc.APIKey)) {
+		t.Fatal("plaintext remained in database after migration checkpoint")
 	}
 }

@@ -1,0 +1,16 @@
+title = "Goose Canvas credential checks"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "goose-canvas-env-credential"
+description = "Real Ark or TOS credentials in environment-style configuration"
+regex = '''(?i)(?:VOLCENGINE_API_KEY|TOS_(?:ACCESS|SECRET)_KEY)[ \t]*=[ \t]*["']?([a-z0-9_./+=-]{16,})'''
+secretGroup = 1
+entropy = 3.0
+
+[[rules.allowlists]]
+description = "Documented example placeholders only"
+regexTarget = "secret"
+regexes = ['''^your-[a-z-]+$''']

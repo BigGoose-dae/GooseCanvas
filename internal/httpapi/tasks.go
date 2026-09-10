@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -83,7 +83,7 @@ func (a *API) listTasks(c *gin.Context) {
 	}
 	views, err := a.queue(wid)
 	if err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(200, views)
@@ -109,7 +109,7 @@ func (a *API) nodeHistory(c *gin.Context) {
 	}
 	var sessions []domain.GenerationSession
 	if err := query.Order("id desc").Limit(21).Find(&sessions).Error; err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	more := len(sessions) > 20
@@ -118,7 +118,7 @@ func (a *API) nodeHistory(c *gin.Context) {
 	}
 	views, err := a.generationViews(sessions)
 	if err != nil {
-		fail(c, 500, err)
+		a.fail(c, 500, err)
 		return
 	}
 	c.JSON(200, gin.H{"items": views, "hasMore": more})
@@ -166,11 +166,11 @@ func (a *API) stream(c *gin.Context) {
 	}
 	var ws domain.Workspace
 	if a.DB.Where("id=? AND deleted_at IS NULL", wid).First(&ws).Error != nil {
-		fail(c, 404, fmt.Errorf("项目不存在"))
+		a.fail(c, 404, fmt.Errorf("项目不存在"))
 		return
 	}
 	if a.Events == nil {
-		fail(c, 503, fmt.Errorf("事件服务未启动"))
+		a.fail(c, 503, fmt.Errorf("事件服务未启动"))
 		return
 	}
 	updates, unsubscribe := a.Events.Subscribe(wid)
@@ -240,7 +240,7 @@ func (a *API) duplicateNode(c *gin.Context) {
 		return tx.Create(&domain.NodeVersion{NodeID: result.ID, Version: 1, AssetID: result.CurrentAssetID, Prompt: result.Prompt, ModelKey: result.ModelKey, Params: result.Params}).Error
 	})
 	if err != nil {
-		fail(c, 400, err)
+		a.fail(c, 400, err)
 		return
 	}
 	view := nodeView{Node: result}
@@ -324,7 +324,7 @@ func (a *API) retryGeneration(c *gin.Context) {
 		return tx.Create(&domain.GenerationTask{SessionID: result.ID, Provider: task.Provider, Status: domain.StatusPending}).Error
 	})
 	if err != nil {
-		fail(c, 409, err)
+		a.fail(c, 409, err)
 		return
 	}
 	a.Events.Notify(result.WorkspaceID)
@@ -338,37 +338,18 @@ func (a *API) downloadAsset(c *gin.Context) {
 	}
 	view, err := a.loadAsset(c.Request.Context(), id)
 	if err != nil {
-		fail(c, 404, err)
+		a.fail(c, 404, err)
 		return
 	}
-	url, err := a.current().Store.PresignGet(c.Request.Context(), view.ObjectKey, 30*time.Minute)
+	file, info, err := a.current().Store.Open(c.Request.Context(), view.ObjectKey)
 	if err != nil {
-		fail(c, 502, err)
+		a.fail(c, 404, err)
 		return
 	}
-	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, url, nil)
-	if err != nil {
-		fail(c, 502, err)
-		return
-	}
-	client := &http.Client{Timeout: 10 * time.Minute}
-	resp, err := client.Do(req)
-	if err != nil {
-		fail(c, 502, err)
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		fail(c, 502, fmt.Errorf("素材下载失败 HTTP %d", resp.StatusCode))
-		return
-	}
+	defer file.Close()
 	name := fmt.Sprintf("goose-canvas-%d%s", view.ID, filepath.Ext(view.ObjectKey))
 	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
 	c.Header("Content-Type", view.ContentType)
 	c.Header("X-Content-Type-Options", "nosniff")
-	if resp.ContentLength >= 0 {
-		c.Header("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
-	}
-	c.Status(200)
-	_, _ = io.Copy(c.Writer, resp.Body)
+	http.ServeContent(c.Writer, c.Request, name, info.ModTime(), file)
 }

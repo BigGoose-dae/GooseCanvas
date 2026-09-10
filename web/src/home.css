@@ -44,8 +44,10 @@
 .home-topbar .brand img {
   width: 36px;
   height: 36px;
-  border: 1px solid var(--home-line);
-  border-radius: 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .home-topbar .brand strong {

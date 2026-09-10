@@ -45,7 +45,7 @@ func (v *Volcengine) Poll(ctx context.Context, externalID string) (Result, error
 	}
 	status := strings.ToLower(firstString(payload, "status", "task_status"))
 	if status == "failed" || status == "error" || status == "expired" || status == "cancelled" || status == "canceled" {
-		return Result{Failed: true, Error: errorMessage(payload, "视频生成失败"), Raw: raw}, nil
+		return Result{Failed: true, Error: v.redact(errorMessage(payload, "视频生成失败")), Raw: raw}, nil
 	}
 	url := nestedString(payload, "content", "video_url", "file_url", "url")
 	if url == "" {
@@ -69,8 +69,8 @@ func (v *Volcengine) submitImage(ctx context.Context, req Request) (Result, erro
 	body := map[string]any{"model": req.Model, "prompt": strings.TrimSpace(req.Prompt) + "\n图片比例：" + ratio, "size": resolution, "response_format": "url", "watermark": false}
 	var images []string
 	for _, input := range req.Inputs {
-		if input.Type == "image" && input.URL != "" {
-			images = append(images, input.URL)
+		if input.Type == "image" && input.DataURI != "" {
+			images = append(images, input.DataURI)
 		}
 	}
 	if len(images) > 0 {
@@ -82,7 +82,7 @@ func (v *Volcengine) submitImage(ctx context.Context, req Request) (Result, erro
 		return Result{}, err
 	}
 	if message := apiError(payload); message != "" {
-		return Result{Failed: true, Error: message, Raw: raw}, nil
+		return Result{Failed: true, Error: v.redact(message), Raw: raw}, nil
 	}
 	if data, ok := payload["data"].([]any); ok {
 		for _, row := range data {
@@ -111,7 +111,7 @@ func (v *Volcengine) submitVideo(ctx context.Context, req Request) (Result, erro
 		content = append(content, map[string]any{"type": "text", "text": strings.TrimSpace(req.Prompt)})
 	}
 	for _, input := range req.Inputs {
-		if input.URL == "" || (input.Type != "image" && input.Type != "video") {
+		if input.DataURI == "" || (input.Type != "image" && input.Type != "video") {
 			continue
 		}
 		kind := input.Type + "_url"
@@ -119,7 +119,7 @@ func (v *Volcengine) submitVideo(ctx context.Context, req Request) (Result, erro
 		if role == "" {
 			role = "reference"
 		}
-		content = append(content, map[string]any{"type": kind, "role": role, kind: map[string]any{"url": input.URL}})
+		content = append(content, map[string]any{"type": kind, "role": role, kind: map[string]any{"url": input.DataURI}})
 	}
 	body := map[string]any{
 		"model": req.Model, "content": content,
@@ -132,7 +132,7 @@ func (v *Volcengine) submitVideo(ctx context.Context, req Request) (Result, erro
 		return Result{}, err
 	}
 	if message := apiError(payload); message != "" {
-		return Result{Failed: true, Error: message, Raw: raw}, nil
+		return Result{Failed: true, Error: v.redact(message), Raw: raw}, nil
 	}
 	id := firstString(payload, "id", "task_id", "taskId")
 	if id == "" {
@@ -166,7 +166,17 @@ func (v *Volcengine) do(ctx context.Context, method, url string, body any, targe
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return raw, fmt.Errorf("volcengine returned HTTP %d: %s", resp.StatusCode, compact(raw))
+		message := compact(raw)
+		var response map[string]any
+		if json.Unmarshal(raw, &response) == nil {
+			if detail := apiError(response); detail != "" {
+				message = detail
+			}
+		}
+		if v.cfg.APIKey != "" {
+			message = strings.ReplaceAll(message, v.cfg.APIKey, "[REDACTED]")
+		}
+		return raw, &HTTPError{Status: resp.StatusCode, Message: message}
 	}
 	if err := json.Unmarshal(raw, target); err != nil {
 		return raw, fmt.Errorf("decode volcengine response: %w", err)
@@ -228,4 +238,11 @@ func compact(raw []byte) string {
 		return s[:500]
 	}
 	return s
+}
+
+func (v *Volcengine) redact(message string) string {
+	if v.cfg.APIKey != "" {
+		return strings.ReplaceAll(message, v.cfg.APIKey, "[REDACTED]")
+	}
+	return message
 }

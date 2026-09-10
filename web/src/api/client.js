@@ -17,7 +17,6 @@ export const api = {
   settings: () => request("/settings"),
   saveSettings: (body) =>
     request("/settings", { method: "PUT", body: JSON.stringify(body) }),
-  testSettings: () => request("/settings/test", { method: "POST" }),
   history: (id, before) =>
     request(`/nodes/${id}/history${before ? `?before=${before}` : ""}`),
   duplicateNode: (id) => request(`/nodes/${id}/duplicate`, { method: "POST" }),

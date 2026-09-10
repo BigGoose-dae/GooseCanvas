@@ -1,10 +1,16 @@
 package generation
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,6 +28,7 @@ import (
 type fakeStore struct{ fail atomic.Bool }
 
 func (s *fakeStore) Ready(context.Context) error { return nil }
+func (s *fakeStore) Key(parts ...string) string  { return filepath.Join(parts...) }
 func (s *fakeStore) Put(_ context.Context, _ string, _ string, _ int64, r io.Reader) (storage.PutResult, error) {
 	if s.fail.Load() {
 		return storage.PutResult{}, fmt.Errorf("storage temporarily unavailable")
@@ -29,8 +36,8 @@ func (s *fakeStore) Put(_ context.Context, _ string, _ string, _ int64, r io.Rea
 	_, err := io.Copy(io.Discard, r)
 	return storage.PutResult{}, err
 }
-func (s *fakeStore) PresignGet(context.Context, string, time.Duration) (string, error) {
-	return "https://example.invalid/input", nil
+func (s *fakeStore) Open(context.Context, string) (*os.File, os.FileInfo, error) {
+	return nil, nil, fmt.Errorf("fixture asset not found")
 }
 func (s *fakeStore) Delete(context.Context, string) error { return nil }
 
@@ -56,13 +63,9 @@ func testEngine(t *testing.T, p provider.Provider, concurrency int) (*Engine, *g
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { sql, _ := db.DB(); sql.Close() })
-	cfg := config.Config{DataDir: dir, Volc: config.Volcengine{APIKey: "test"}, TOS: config.TOS{Bucket: "test", Region: "cn-beijing", Endpoint: "https://tos-cn-beijing.volces.com", AccessKey: "test", SecretKey: "test", Prefix: "review", PresignTTL: time.Hour}, Worker: config.Worker{Concurrency: concurrency, PollInterval: time.Hour, TaskTimeout: time.Minute}}
-	tos, err := storage.NewTOS(cfg.TOS)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := config.Config{DataDir: dir, Volc: config.Volcengine{APIKey: "test"}, Worker: config.Worker{Concurrency: concurrency, PollInterval: time.Hour, TaskTimeout: time.Minute}}
 	store := &fakeStore{}
-	snap := runtime.Snapshot{Config: cfg, Store: store, TOS: tos, Provider: p}
+	snap := runtime.Snapshot{Config: cfg, Store: store, Provider: p}
 	e := &Engine{db: db, snapshot: func() runtime.Snapshot { return snap }, hub: events.New(), active: map[uint64]bool{}, clients: map[uint64]runtime.Snapshot{}}
 	return e, db, store
 }
@@ -192,5 +195,68 @@ func TestRestartDoesNotResubmitUncertainSubmission(t *testing.T) {
 	awaitStatus(t, db, task.ID, domain.StatusFailed)
 	if p.calls.Load() != 0 {
 		t.Fatal("uncertain provider submission was repeated")
+	}
+}
+
+func TestBuildRequestEncodesLocalAssetWithoutPersistingBase64(t *testing.T) {
+	p := &fakeProvider{submit: func(context.Context, provider.Request) (provider.Result, error) { return provider.Result{}, nil }}
+	e, db, _ := testEngine(t, p, 1)
+	local, err := storage.NewLocal(filepath.Join(t.TempDir(), "assets"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := []byte("image bytes")
+	key := local.Key("uploads", "input.png")
+	if _, err := local.Put(context.Background(), key, "image/png", int64(len(data)), bytes.NewReader(data)); err != nil {
+		t.Fatal(err)
+	}
+	asset := domain.Asset{WorkspaceID: 1, AssetType: "image", StorageProvider: "local", ObjectKey: key, ContentType: "image/png", Size: int64(len(data))}
+	db.Create(&asset)
+	session := domain.GenerationSession{WorkspaceID: 1, NodeID: 1, TaskType: "image", ModelKey: "model", Params: "{}"}
+	db.Create(&session)
+	db.Create(&domain.GenerationInput{SessionID: session.ID, AssetID: asset.ID, InputType: "image", InputRole: "reference"})
+	e.store = local
+	request, err := e.buildRequest(context.Background(), session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "data:image/png;base64,aW1hZ2UgYnl0ZXM="
+	if len(request.Inputs) != 1 || request.Inputs[0].DataURI != want {
+		t.Fatalf("encoded input = %#v", request.Inputs)
+	}
+	audit, _ := json.Marshal(request)
+	if strings.Contains(string(audit), "aW1hZ2UgYnl0ZXM=") {
+		t.Fatal("base64 body leaked into persisted request payload")
+	}
+}
+
+func TestPersistResultDownloadsTemporaryURLToLocalStore(t *testing.T) {
+	want := []byte("generated video")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "video/mp4")
+		_, _ = w.Write(want)
+	}))
+	defer server.Close()
+	dir := t.TempDir()
+	store, err := storage.NewLocal(filepath.Join(dir, "assets"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := New(nil, store, nil, config.Config{DataDir: dir})
+	asset, err := e.persistResult(context.Background(), domain.GenerationSession{ID: 7, WorkspaceID: 3, TaskType: "video"}, provider.Result{Done: true, URL: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asset.StorageProvider != "local" || asset.ObjectKey != "generated/3/7/result.mp4" {
+		t.Fatalf("archived asset = %+v", asset)
+	}
+	file, _, err := store.Open(context.Background(), asset.ObjectKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(file)
+	file.Close()
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("downloaded result = %q, err = %v", got, err)
 	}
 }

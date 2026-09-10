@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +21,6 @@ import (
 type Snapshot struct {
 	Config   config.Config
 	Store    storage.Store
-	TOS      *storage.TOSStore
 	Provider provider.Provider
 }
 
@@ -33,10 +34,18 @@ type Manager struct {
 func New(db *gorm.DB, cfg config.Config) (*Manager, error) {
 	var row domain.SystemSetting
 	err := db.First(&row, 1).Error
+	legacy := err == nil && !strings.HasPrefix(row.Value, vaultPrefix)
 	if err == nil {
 		// Server bind address and data directory remain process bootstrap settings.
 		boot := cfg
-		if err := json.Unmarshal([]byte(row.Value), &cfg); err != nil {
+		raw := []byte(row.Value)
+		if !legacy {
+			raw, err = openSettings(boot.DataDir, row.Value)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if err := json.Unmarshal(raw, &cfg); err != nil {
 			return nil, err
 		}
 		cfg.Addr, cfg.DataDir, cfg.Database = boot.Addr, boot.DataDir, boot.Database
@@ -47,7 +56,22 @@ func New(db *gorm.DB, cfg config.Config) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{db: db, current: snap}, nil
+	manager := &Manager{db: db, current: snap}
+	if legacy {
+		if err := manager.Update(func(*config.Config) error { return nil }); err != nil {
+			return nil, err
+		}
+		// Flush the secure-delete update to the main database and remove plaintext
+		// WAL pages before serving requests. Existing external backups are unaffected.
+		var checkpoint struct{ Busy int }
+		if err := db.Raw("PRAGMA wal_checkpoint(TRUNCATE)").Scan(&checkpoint).Error; err != nil {
+			return nil, err
+		}
+		if checkpoint.Busy != 0 {
+			return nil, fmt.Errorf("旧配置迁移需要独占数据库，请停止其他使用此数据目录的实例")
+		}
+	}
+	return manager, nil
 }
 
 func (m *Manager) Snapshot() Snapshot { m.mu.RLock(); defer m.mu.RUnlock(); return m.current }
@@ -67,7 +91,11 @@ func (m *Manager) Update(change func(*config.Config) error) error {
 	if err != nil {
 		return err
 	}
-	if err := m.db.Save(&domain.SystemSetting{ID: 1, Value: string(raw)}).Error; err != nil {
+	encrypted, err := sealSettings(cfg.DataDir, raw)
+	if err != nil {
+		return err
+	}
+	if err := m.db.Save(&domain.SystemSetting{ID: 1, Value: encrypted}).Error; err != nil {
 		return err
 	}
 	m.current = snap
@@ -81,22 +109,29 @@ func build(cfg config.Config) (Snapshot, error) {
 	if cfg.Worker.PollInterval <= 0 || cfg.Worker.TaskTimeout < time.Minute {
 		return Snapshot{}, fmt.Errorf("轮询间隔必须为正数，任务超时至少 1 分钟")
 	}
-	for _, value := range []string{cfg.Volc.BaseURL, cfg.TOS.Endpoint} {
+	for _, value := range []string{cfg.Volc.BaseURL} {
 		parsed, err := url.Parse(value)
 		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 			return Snapshot{}, fmt.Errorf("服务地址必须是有效的 HTTP 或 HTTPS 地址")
 		}
 	}
+	for _, value := range []string{cfg.Volc.BaseURL} {
+		parsed, _ := url.Parse(value)
+		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return Snapshot{}, fmt.Errorf("服务地址不能包含凭证、查询参数或片段")
+		}
+		host := parsed.Hostname()
+		local := host == "localhost" || net.ParseIP(host).IsLoopback()
+		if parsed.Scheme == "http" && !local {
+			return Snapshot{}, fmt.Errorf("远程服务请使用 HTTPS，以保护传输中的凭证")
+		}
+	}
 	if strings.TrimSpace(cfg.AppName) == "" {
 		return Snapshot{}, fmt.Errorf("应用名称不能为空")
 	}
-	snap := Snapshot{Config: cfg, Provider: provider.NewVolcengine(cfg.Volc)}
-	if len(cfg.StorageMissing()) == 0 {
-		store, err := storage.NewTOS(cfg.TOS)
-		if err != nil {
-			return Snapshot{}, err
-		}
-		snap.Store, snap.TOS = store, store
+	store, err := storage.NewLocal(filepath.Join(cfg.DataDir, "assets"))
+	if err != nil {
+		return Snapshot{}, err
 	}
-	return snap, nil
+	return Snapshot{Config: cfg, Store: store, Provider: provider.NewVolcengine(cfg.Volc)}, nil
 }

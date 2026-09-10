@@ -253,7 +253,10 @@ export default function CanvasPage() {
             : null),
       };
       rawRef.current.set(String(node.id), node);
-      setNodes((list) => [...list, toFlowNode(node)]);
+      setNodes((list) => [
+        ...list.map((item) => ({ ...item, selected: false })),
+        { ...toFlowNode(node), selected: true },
+      ]);
       setSelectedId(String(node.id));
       return node;
     },
@@ -927,6 +930,9 @@ export default function CanvasPage() {
               return;
             }
             setSelectedId(key);
+            setNodes((list) =>
+              list.map((node) => ({ ...node, selected: node.id === key })),
+            );
             flowRef.current?.fitView({
               nodes: [{ id: key }],
               maxZoom: 1,

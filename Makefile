@@ -1,4 +1,4 @@
-.PHONY: dev-api dev-web build test
+.PHONY: dev-api dev-web build test secrets
 
 dev-api:
 	go run ./cmd/server
@@ -14,3 +14,6 @@ test:
 	go test ./...
 	cd web && npm test
 	cd web && npm run build
+
+secrets:
+	sh scripts/check-secrets.sh
