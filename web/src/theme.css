@@ -31,7 +31,8 @@ body,
   color: var(--text);
 }
 
-.theme-toggle {
+.theme-toggle,
+.language-toggle {
   display: grid !important;
   width: 34px;
   height: 34px;
@@ -44,6 +45,14 @@ body,
   color: var(--text) !important;
   font-size: 16px !important;
   line-height: 1;
+}
+
+.language-toggle {
+  width: auto !important;
+  min-width: 48px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  font-weight: 700;
 }
 
 .settings-actions {

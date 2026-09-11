@@ -8,8 +8,15 @@ export async function request(path, options = {}) {
   const response = await fetch(`/api/v1${path}`, { ...options, headers });
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
-  if (!response.ok)
-    throw new Error(data.error || `请求失败（${response.status}）`);
+  if (!response.ok) {
+    const english = localStorage.getItem("goose-canvas-language") === "en";
+    throw new Error(
+      data.error ||
+        (english
+          ? `Request failed (${response.status})`
+          : `请求失败（${response.status}）`),
+    );
+  }
   return data;
 }
 

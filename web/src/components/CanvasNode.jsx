@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { api } from "../api/client";
+import { useLanguage } from "../i18n/LanguageContext";
 
-const labels = { text: "文本", image: "图片", video: "视频" };
 const icons = { text: "T", image: "▧", video: "▶" };
 
 export default function CanvasNode({ id, data, selected }) {
+  const { t } = useLanguage();
+  const labels = { text: t("text"), image: t("image"), video: t("video") };
   const node = data.node;
   const generation = node.generation;
   const running = ["pending", "submitting", "processing", "archiving"].includes(
@@ -50,7 +52,7 @@ export default function CanvasNode({ id, data, selected }) {
             autoFocus
             className="workshop-text nodrag nowheel"
             value={node.prompt || ""}
-            placeholder="在此输入文本…"
+            placeholder={t("textPlaceholder")}
             onPointerDown={(event) => event.stopPropagation()}
             onChange={(event) =>
               data.change(id, { prompt: event.target.value })
@@ -65,7 +67,7 @@ export default function CanvasNode({ id, data, selected }) {
             className={`workshop-text-view ${node.prompt ? "" : "empty"}`}
             onDoubleClick={beginTextEditing}
           >
-            {node.prompt || "在此输入文本…"}
+            {node.prompt || t("textPlaceholder")}
           </div>
         )
       ) : (
@@ -73,7 +75,7 @@ export default function CanvasNode({ id, data, selected }) {
           {node.asset?.url && node.nodeType === "image" && (
             <img
               src={node.asset.url}
-              alt={node.title || "图片"}
+              alt={node.title || t("image")}
               draggable="false"
             />
           )}
@@ -102,7 +104,7 @@ export default function CanvasNode({ id, data, selected }) {
                 <button
                   type="button"
                   className="nodrag"
-                  aria-label="加载并播放视频"
+                  aria-label={t("playVideo")}
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -116,12 +118,12 @@ export default function CanvasNode({ id, data, selected }) {
           {!node.asset?.url && (
             <div className="workshop-placeholder">
               <b>{icons[node.nodeType]}</b>
-              <span>{running ? "生成处理中" : labels[node.nodeType]}</span>
+              <span>{running ? t("generating") : labels[node.nodeType]}</span>
             </div>
           )}
           {failed && (
             <div className="workshop-failed" title={generation.errorMessage}>
-              ! {generation.errorMessage || "生成失败"}
+              ! {generation.errorMessage || t("generationFailed")}
             </div>
           )}
         </div>
@@ -134,36 +136,36 @@ export default function CanvasNode({ id, data, selected }) {
           <span className={`node-save-state ${data.saveState}`} role="status">
             {
               {
-                saved: "已保存",
-                pending: "待保存",
-                saving: "保存中",
-                error: "保存失败",
+                saved: t("saved"),
+                pending: t("savePending"),
+                saving: t("saving"),
+                error: t("saveFailed"),
               }[data.saveState]
             }
           </span>
-          <button onClick={() => data.copy(id)}>复制</button>
+          <button onClick={() => data.copy(id)}>{t("copy")}</button>
           {node.nodeType !== "text" && (
-            <button onClick={() => data.history(id)}>历史</button>
+            <button onClick={() => data.history(id)}>{t("history")}</button>
           )}
           {node.currentAssetId && (
             <a href={api.downloadURL(node.currentAssetId)} download>
-              ↓ 下载
+              ↓ {t("download")}
             </a>
           )}
           {data.saveState === "error" && (
-            <button onClick={() => data.save(id)}>重试保存</button>
+            <button onClick={() => data.save(id)}>{t("retrySave")}</button>
           )}
         </div>
       )}
       {running && (
         <div className="workshop-progress">
           <i />
-          处理中
+          {t("processing")}
         </div>
       )}
       <button
         className="workshop-resize nodrag"
-        aria-label="调整节点大小"
+        aria-label={t("resizeNode")}
         onPointerDown={(event) => data.resize(event, id)}
       />
       <Handle

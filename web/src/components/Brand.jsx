@@ -1,7 +1,9 @@
 import { useTheme } from '../theme/ThemeContext'
+import { useLanguage } from '../i18n/LanguageContext'
 
 export default function Brand({ app, compact = false }) {
   const { theme } = useTheme()
+  const { t } = useLanguage()
   const customLogo = Boolean(app?.logoUrl)
   const defaultLogo = theme === 'dark'
     ? '/brand/goose-canvas-mark-white-transparent.png?v=1'
@@ -14,6 +16,6 @@ export default function Brand({ app, compact = false }) {
       src={logoUrl}
       alt={`${app?.name || 'Goose Canvas'} logo`}
     />
-    <div><strong>{app?.name || 'Goose Canvas'}</strong>{!compact && <span>开放式 AI 创作画布</span>}</div>
+    <div><strong>{app?.name || 'Goose Canvas'}</strong>{!compact && <span>{t('brandTagline')}</span>}</div>
   </div>
 }

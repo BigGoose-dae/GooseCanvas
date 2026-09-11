@@ -1,21 +1,24 @@
+import { useLanguage } from "../i18n/LanguageContext";
+
 export default function StatusPanel({ status }) {
+  const { t } = useLanguage();
   if (!status || status.ready) return null;
   return (
     <div className="status-panel">
       <div>
-        <strong>还差一步即可开始</strong>
-        <span>前往设置页面，连接生成模型。</span>
+        <strong>{t("setupTitle")}</strong>
+        <span>{t("setupDescription")}</span>
       </div>
-      <a href="/settings">打开创作设置 →</a>
+      <a href="/settings">{t("openSettings")}</a>
       <div className="status-tags">
         {(status.missing || []).map((item) => (
           <code key={item}>
             {{
-              VOLCENGINE_API_KEY: "模型密钥",
+              VOLCENGINE_API_KEY: t("modelCredential"),
             }[item] || item}
           </code>
         ))}
-        {status.storage?.status === "error" && <code>本地素材目录不可用</code>}
+        {status.storage?.status === "error" && <code>{t("storageUnavailable")}</code>}
       </div>
       {status.storage?.message && <small>{status.storage.message}</small>}
     </div>

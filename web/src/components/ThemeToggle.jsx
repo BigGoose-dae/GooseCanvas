@@ -1,8 +1,10 @@
 import { useTheme } from '../theme/ThemeContext'
+import { useLanguage } from '../i18n/LanguageContext'
 
 export default function ThemeToggle() {
   const { theme, toggleTheme } = useTheme()
-  const nextLabel = theme === 'dark' ? '切换到日间模式' : '切换到夜间模式'
+  const { t } = useLanguage()
+  const nextLabel = theme === 'dark' ? t('themeLight') : t('themeDark')
 
   return <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={nextLabel} title={nextLabel}>
     <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>

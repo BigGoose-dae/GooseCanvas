@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
+import LanguageToggle from "./LanguageToggle";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const emptyForm = {
   key: "",
@@ -19,6 +21,7 @@ const emptyForm = {
 
 export default function ModelSettings() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [models, setModels] = useState([]),
     [status, setStatus] = useState(null),
     [editingId, setEditingId] = useState(null);
@@ -92,13 +95,13 @@ export default function ModelSettings() {
       };
       if (editingId) await api.updateModel(editingId, payload);
       else await api.createModel(payload);
-      setSaved(editingId ? "模型已更新" : "模型已添加");
+      setSaved(editingId ? t("modelUpdated") : t("modelAdded"));
       await load();
       if (!editingId) setForm(emptyForm);
     } catch (e) {
       setError(
         e instanceof SyntaxError
-          ? "Inputs、默认参数或可选参数不是有效 JSON"
+          ? t("invalidModelJson")
           : e.message,
       );
     }
@@ -112,7 +115,7 @@ export default function ModelSettings() {
     }
   };
   const remove = async (model) => {
-    if (!confirm(`删除模型“${model.name}”？`)) return;
+    if (!confirm(t("confirmDeleteModel", { name: model.name }))) return;
     try {
       await api.deleteModel(model.id);
       if (editingId === model.id) reset();
@@ -127,10 +130,11 @@ export default function ModelSettings() {
       <header className="topbar">
         <Brand app={status?.app} />
         <div className="settings-actions">
-          <button onClick={() => navigate("/settings")}>创作设置</button>
+          <button onClick={() => navigate("/settings")}>{t("creativeSettings")}</button>
+          <LanguageToggle />
           <ThemeToggle />
           <button className="settings-back" onClick={() => navigate(-1)}>
-            返回
+            {t("back")}
           </button>
         </div>
       </header>
@@ -138,14 +142,11 @@ export default function ModelSettings() {
         <section className="model-list">
           <div className="model-title">
             <div>
-              <span>MODEL REGISTRY</span>
-              <h1>模型管理</h1>
-              <p>
-                模型 Key 与能力参数保存在
-                SQLite；凭证可在创作设置中配置，由本机后端保存。
-              </p>
+              <span>{t("modelRegistry")}</span>
+              <h1>{t("modelManagement")}</h1>
+              <p>{t("modelSettingsDescription")}</p>
             </div>
-            <button onClick={reset}>＋ 添加模型</button>
+            <button onClick={reset}>＋ {t("addModel")}</button>
           </div>
           {models.map((model) => (
             <article
@@ -153,28 +154,28 @@ export default function ModelSettings() {
               key={model.id}
             >
               <div className={`model-kind ${model.taskType}`}>
-                {model.taskType === "image" ? "图" : "视"}
+                {model.taskType === "image" ? t("imageShort") : t("videoShort")}
               </div>
               <div className="model-main">
                 <div>
                   <h3>{model.name}</h3>
-                  {model.builtin && <em>内置</em>}
-                  <span>{model.enabled ? "已启用" : "已停用"}</span>
+                  {model.builtin && <em>{t("builtin")}</em>}
+                  <span>{model.enabled ? t("enabled") : t("disabled")}</span>
                 </div>
                 <code>{model.key}</code>
                 <p>
                   {model.provider} · {model.protocol} ·{" "}
-                  {model.description || "暂无描述"}
+                  {model.description || t("noDescription")}
                 </p>
               </div>
               <div className="model-actions">
-                <button onClick={() => edit(model)}>编辑</button>
+                <button onClick={() => edit(model)}>{t("edit")}</button>
                 <button onClick={() => toggle(model)}>
-                  {model.enabled ? "停用" : "启用"}
+                  {model.enabled ? t("disable") : t("enable")}
                 </button>
                 {!model.builtin && (
                   <button className="danger" onClick={() => remove(model)}>
-                    删除
+                    {t("delete")}
                   </button>
                 )}
               </div>
@@ -184,82 +185,82 @@ export default function ModelSettings() {
         <form className="model-form" onSubmit={submit}>
           <div>
             <small>{editingId ? "EDIT MODEL" : "NEW MODEL"}</small>
-            <h2>{editingId ? "编辑模型" : "接入模型"}</h2>
+            <h2>{editingId ? t("editModel") : t("connectModel")}</h2>
           </div>
           <label>
-            显示名称
+            {t("displayName")}
             <input
               required
               value={form.name}
               onChange={(e) => change("name", e.target.value)}
-              placeholder="例如 Seedream 5.0"
+              placeholder={t("displayNamePlaceholder")}
             />
           </label>
           <label>
-            模型 Key
+            {t("modelKey")}
             <input
               required
               disabled={Boolean(editingId)}
               value={form.key}
               onChange={(e) => change("key", e.target.value)}
-              placeholder="控制台中的模型 ID"
+              placeholder={t("modelKeyPlaceholder")}
             />
           </label>
           <div className="form-grid">
             <label>
-              任务类型
+              {t("taskType")}
               <select
                 value={form.taskType}
                 onChange={(e) => changeType(e.target.value)}
               >
-                <option value="image">图片</option>
-                <option value="video">视频</option>
+                <option value="image">{t("image")}</option>
+                <option value="video">{t("video")}</option>
               </select>
             </label>
             <label>
-              供应商
+              {t("provider")}
               <select
                 value={form.provider}
                 onChange={(e) => change("provider", e.target.value)}
               >
-                <option value="volcengine">火山引擎</option>
+                <option value="volcengine">{t("volcengine")}</option>
               </select>
             </label>
           </div>
           <label>
-            调用协议
+            {t("protocol")}
             <select
               value={form.protocol}
               onChange={(e) => change("protocol", e.target.value)}
             >
-              <option value="ark-image-v3">Ark 图片生成 v3</option>
-              <option value="ark-video-v3">Ark 视频任务 v3</option>
+              <option value="ark-image-v3">{t("arkImageProtocol")}</option>
+              <option value="ark-video-v3">{t("arkVideoProtocol")}</option>
             </select>
           </label>
           <label>
-            说明
+            {t("description")}
             <input
               value={form.description}
               onChange={(e) => change("description", e.target.value)}
-              placeholder="模型用途"
+              placeholder={t("modelPurpose")}
             />
           </label>
           <label>
-            允许的输入类型（JSON）
+            {t("allowedInputs")}
             <textarea
               value={form.inputs}
               onChange={(e) => change("inputs", e.target.value)}
             />
           </label>
           <label>
-            默认参数（JSON）
+            {t("defaultParams")}
             <textarea
               value={form.defaults}
               onChange={(e) => change("defaults", e.target.value)}
             />
           </label>
           <label>
-            可选参数（JSON）
+            {t("optionalParams")}
             <textarea
               value={form.options}
               onChange={(e) => change("options", e.target.value)}
@@ -271,16 +272,16 @@ export default function ModelSettings() {
               checked={form.enabled}
               onChange={(e) => change("enabled", e.target.checked)}
             />
-            启用此模型
+            {t("enableModel")}
           </label>
           {error && <p className="form-error">{error}</p>}
           {saved && <p className="form-saved">{saved}</p>}
           <div className="form-actions">
             <button type="button" onClick={reset}>
-              重置
+              {t("reset")}
             </button>
             <button className="primary">
-              {editingId ? "保存修改" : "添加模型"}
+              {editingId ? t("saveChanges") : t("addModel")}
             </button>
           </div>
         </form>

@@ -4,9 +4,12 @@ import { api } from "../api/client";
 import Brand from "./Brand";
 import StatusPanel from "./StatusPanel";
 import ThemeToggle from "./ThemeToggle";
+import LanguageToggle from "./LanguageToggle";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function Projects() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState(null);
   const [name, setName] = useState("");
@@ -34,7 +37,7 @@ export default function Projects() {
     try {
       setError("");
       const item = await api.createWorkspace({
-        name: name.trim() || "未命名项目",
+        name: name.trim() || t("untitledProject"),
       });
       navigate(`/canvas/${item.id}`);
     } catch (createError) {
@@ -44,7 +47,7 @@ export default function Projects() {
 
   const remove = async (event, id) => {
     event.stopPropagation();
-    if (!confirm("删除这个项目？")) return;
+    if (!confirm(t("confirmDeleteProject"))) return;
     await api.deleteWorkspace(id);
     load();
   };
@@ -57,8 +60,8 @@ export default function Projects() {
       <header className="topbar home-topbar">
         <Brand app={status?.app} />
         <nav className="top-links">
-          <button onClick={() => navigate("/settings")}>设置</button>
-          <button onClick={() => navigate("/settings/models")}>模型管理</button>
+          <button onClick={() => navigate("/settings")}>{t("settings")}</button>
+          <button onClick={() => navigate("/settings/models")}>{t("modelManagement")}</button>
           <a
             href={status?.app?.repositoryUrl || "https://github.com"}
             target="_blank"
@@ -67,6 +70,7 @@ export default function Projects() {
             GitHub <span aria-hidden="true">↗</span>
           </a>
           <ThemeToggle />
+          <LanguageToggle />
         </nav>
       </header>
 
@@ -74,16 +78,15 @@ export default function Projects() {
         <section className="home-hero">
           <div className="hero-copy">
             <div className="eyebrow">
-              <i /> LOCAL-FIRST CREATIVE CANVAS
+              <i /> {t("homeEyebrow")}
             </div>
             <h1>
-              让灵感，
+              {t("homeTitleLine1")}
               <br />
-              自由生长。
+              {t("homeTitleLine2")}
             </h1>
             <p>
-              一个轻量、开放的 AI
-              创作画布。连接文字、图像与视频，在属于你的工作流里持续创作。
+              {t("homeDescription")}
             </p>
             <div className="hero-actions">
               <button
@@ -91,9 +94,9 @@ export default function Projects() {
                 className="hero-primary"
                 onClick={focusNewProject}
               >
-                开始创作 <span>→</span>
+                {t("startCreating")} <span>→</span>
               </button>
-              <span>文字 · 图像 · 视频</span>
+              <span>{t("mediaTypes")}</span>
             </div>
           </div>
 
@@ -103,7 +106,7 @@ export default function Projects() {
             <div className="hero-flow-line line-two" />
             <div className="hero-node hero-node-text">
               <small>TEXT</small>
-              <span>想象一座漂浮在云端的城市</span>
+              <span>{t("heroPrompt")}</span>
               <b>01</b>
             </div>
             <div className="hero-node hero-node-image">
@@ -121,7 +124,7 @@ export default function Projects() {
               <b>03</b>
             </div>
             <div className="hero-canvas-caption">
-              <span>∞</span> 无限画布 · 自由连接
+              <span>∞</span> {t("infiniteCanvas")}
             </div>
           </div>
         </section>
@@ -131,12 +134,12 @@ export default function Projects() {
         <section className="project-section">
           <div className="section-title">
             <div>
-              <span className="section-kicker">YOUR WORKSPACES</span>
-              <h2>最近项目</h2>
+              <span className="section-kicker">{t("yourWorkspaces")}</span>
+              <h2>{t("recentProjects")}</h2>
               <p>
                 {items.length
-                  ? `${items.length} 个创作空间`
-                  : "从一张空白画布开始"}
+                  ? t("workspaceCount", { count: items.length })
+                  : t("startBlank")}
               </p>
             </div>
             <form onSubmit={create}>
@@ -144,11 +147,11 @@ export default function Projects() {
                 className="new-project-input"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="给新项目起个名字"
-                aria-label="项目名称"
+                placeholder={t("projectPlaceholder")}
+                aria-label={t("projectName")}
               />
               <button type="submit">
-                <span>＋</span> 新建画布
+                <span>＋</span> {t("newCanvas")}
               </button>
             </form>
           </div>
@@ -178,11 +181,11 @@ export default function Projects() {
                 <div className="project-info">
                   <div>
                     <h3>{item.name}</h3>
-                    <p>{item.description || "继续你的画布创作"}</p>
+                    <p>{item.description || t("continueCanvas")}</p>
                   </div>
                   <button
                     className="icon-button"
-                    aria-label={`删除${item.name}`}
+                    aria-label={t("deleteProjectLabel", { name: item.name })}
                     onClick={(event) => remove(event, item.id)}
                   >
                     ×
@@ -193,8 +196,8 @@ export default function Projects() {
             {!items.length && (
               <button className="empty-state" onClick={focusNewProject}>
                 <span>＋</span>
-                <strong>创建第一个项目</strong>
-                <small>进入你的无限画布</small>
+                <strong>{t("createFirstProject")}</strong>
+                <small>{t("enterCanvas")}</small>
               </button>
             )}
           </div>

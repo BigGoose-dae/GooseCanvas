@@ -3,9 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
+import LanguageToggle from "./LanguageToggle";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function SystemSettings() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [form, setForm] = useState(null);
   const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +33,7 @@ export default function SystemSettings() {
     try {
       const data = await api.saveSettings(form);
       setForm({ ...data, apiKey: "" });
-      setSaved("设置已保存并生效，无需重启。");
+      setSaved(t("settingsSaved"));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -47,14 +50,14 @@ export default function SystemSettings() {
         onChange={(event) => change(key, event.target.value)}
         placeholder={
           form[`${key}Configured`]
-            ? "已配置；留空保留现有凭证"
-            : `请输入${label}`
+            ? t("configured")
+            : t("enterSecret", { label })
         }
       />
       <small>
         {form[`${key}Configured`]
-          ? "已安全提交至本机后端，不回显原值"
-          : "尚未配置"}
+          ? t("secretStored")
+          : t("notConfigured")}
       </small>
     </label>
   );
@@ -63,19 +66,18 @@ export default function SystemSettings() {
       <header className="topbar">
         <Brand app={{ name: form?.appName }} />
         <div className="settings-actions">
-          <button onClick={() => navigate("/settings/models")}>模型管理</button>
+          <button onClick={() => navigate("/settings/models")}>{t("modelManagement")}</button>
+          <LanguageToggle />
           <ThemeToggle />
-          <button onClick={() => navigate(-1)}>返回</button>
+          <button onClick={() => navigate(-1)}>{t("back")}</button>
         </div>
       </header>
       <div className="system-settings-shell">
         <div className="settings-intro">
-          <small>YOUR CREATIVE WORKSPACE</small>
-          <h1>创作设置</h1>
-          <p>连接生成模型，上传素材与生成结果会自动保存在本机。</p>
-          <p>
-            设置保存在本机，密钥不会回显到页面。首次使用只需填写方舟 API Key。
-          </p>
+          <small>{t("creativeWorkspace")}</small>
+          <h1>{t("creativeSettings")}</h1>
+          <p>{t("settingsLead")}</p>
+          <p>{t("settingsPrivacy")}</p>
         </div>
         {error && (
           <p className="form-error" role="alert">
@@ -83,15 +85,15 @@ export default function SystemSettings() {
           </p>
         )}
         {!form ? (
-          <p>正在加载配置…</p>
+          <p>{t("loadingSettings")}</p>
         ) : (
           <form onSubmit={save} className="system-settings-form">
             <fieldset disabled={busy}>
               <legend>
-                <b>01</b> 基础设置
+                <b>01</b> {t("basicSettings")}
               </legend>
               <label>
-                应用名称
+                {t("appName")}
                 <input
                   required
                   value={form.appName}
@@ -101,14 +103,14 @@ export default function SystemSettings() {
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
-                <b>02</b> 图片与视频生成
+                <b>02</b> {t("imageVideoGeneration")}
               </legend>
-              <p>填写火山方舟控制台的 API Key，用于调用已开通的生成模型。</p>
-              {secret("apiKey", "方舟 API Key")}
+              <p>{t("apiKeyHelp")}</p>
+              {secret("apiKey", t("arkApiKey"))}
               <details>
-                <summary>高级连接设置</summary>
+                <summary>{t("advancedConnection")}</summary>
                 <label>
-                  方舟服务地址
+                  {t("arkBaseUrl")}
                   <input
                     required
                     type="url"
@@ -120,22 +122,22 @@ export default function SystemSettings() {
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
-                <b>03</b> 素材存储
+                <b>03</b> {t("assetStorage")}
               </legend>
-              <p>文件上传后保存在本地，调用模型时由 Go 服务编码为 Base64。</p>
+              <p>{t("storageHelp")}</p>
               <label>
-                本地素材目录
+                {t("assetDirectory")}
                 <input readOnly value={form.assetDirectory} />
-                <small>模型返回临时下载地址时，结果也会立即归档到此目录。</small>
+                <small>{t("archiveHelp")}</small>
               </label>
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
-                <b>04</b> 任务执行
+                <b>04</b> {t("taskExecution")}
               </legend>
               <div className="settings-grid">
                 <label>
-                  最大并发请求数
+                  {t("maxConcurrency")}
                   <input
                     required
                     type="number"
@@ -146,10 +148,10 @@ export default function SystemSettings() {
                       change("concurrency", Number(event.target.value))
                     }
                   />
-                  <small>默认 4。等待视频生成的任务不占用请求名额。</small>
+                  <small>{t("concurrencyHelp")}</small>
                 </label>
                 <label>
-                  任务查询超时（分钟）
+                  {t("timeoutMinutes")}
                   <input
                     required
                     type="number"
@@ -160,7 +162,7 @@ export default function SystemSettings() {
                       change("timeoutMinutes", Number(event.target.value))
                     }
                   />
-                  <small>超时停止本地查询，可在队列中继续查询原任务。</small>
+                  <small>{t("timeoutHelp")}</small>
                 </label>
               </div>
             </fieldset>
@@ -171,7 +173,7 @@ export default function SystemSettings() {
             )}
             <div className="settings-savebar">
               <button className="primary" type="submit" disabled={busy}>
-                {busy ? "处理中…" : "保存设置"}
+                {busy ? t("processing") : t("saveSettings")}
               </button>
             </div>
           </form>

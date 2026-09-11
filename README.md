@@ -1,5 +1,7 @@
 # Goose Canvas
 
+[简体中文](README.md) | [English](README.en.md)
+
 一个独立、轻量、可本地运行的 AI 创作画布。项目只保留 Go 与 Web 两端，不依赖 Java 调度器；Go 服务内置并发任务队列，通过 SSE 向 Web 推送任务状态。
 
 当前版本默认使用：
@@ -8,6 +10,7 @@
 - 火山引擎方舟调用 Seedream 图片能力和 Seedance 视频能力。
 - 本地文件夹保存上传素材与最终生成结果；调用模型时由 Go 服务编码为 Base64。
 - React + Vite + XYFlow 提供项目列表和无限画布。
+- Web 界面支持中文和英文切换，语言偏好保存在当前浏览器。
 
 ## 已支持
 

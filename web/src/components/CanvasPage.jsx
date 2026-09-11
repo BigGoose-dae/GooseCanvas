@@ -16,14 +16,17 @@ import { useTheme } from "../theme/ThemeContext";
 import { useAutosave } from "../hooks/useAutosave";
 import { nodePayload, mergeTaskState } from "../api/autosave";
 import TaskPanel, { isRunning } from "./TaskPanel";
+import LanguageToggle from "./LanguageToggle";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const nodeTypes = { canvasNode: CanvasNode };
-const labels = { text: "文本", image: "图片", video: "视频" };
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 export default function CanvasPage() {
   const { id } = useParams();
   const { theme } = useTheme();
+  const { t } = useLanguage();
+  const labels = { text: t("text"), image: t("image"), video: t("video") };
   const navigate = useNavigate();
   const {
     queue,
@@ -267,7 +270,7 @@ export default function CanvasPage() {
       const model = models.find((item) => item.taskType === type);
       const created = await api.createNode(id, {
         nodeType: type,
-        title: title || `新${labels[type]}`,
+        title: title || t("newNode", { type: labels[type] }),
         modelKey: model?.key || "",
         params: model?.defaults || {},
         posX: point.x,
@@ -295,7 +298,7 @@ export default function CanvasPage() {
       }
       return created;
     },
-    [id, models, addLocalNode, setEdges],
+    [id, models, addLocalNode, setEdges, t],
   );
   const duplicate = useCallback(
     async (nodeId) => {
@@ -395,7 +398,7 @@ export default function CanvasPage() {
       await queue.flushAll();
       navigate(destination);
     } catch {
-      setMessage("仍有内容未保存，请重试保存后再离开。草稿已保留在此浏览器。");
+      setMessage(t("unsavedLeave"));
     }
   };
   const resize = useCallback(
@@ -573,7 +576,7 @@ export default function CanvasPage() {
     event.target.value = "";
     if (!file) return;
     try {
-      setMessage("正在上传…");
+      setMessage(t("uploading"));
       const asset = await api.upload(id, file),
         type = file.type.startsWith("image/") ? "image" : "video",
         point = Number.isFinite(contextMenu.flowX)
@@ -615,21 +618,21 @@ export default function CanvasPage() {
           ←
         </button>
         <Brand app={status?.app} compact />
-        <div className="project-name">{workspace?.name || "加载中…"}</div>
+        <div className="project-name">{workspace?.name || t("loading")}</div>
         <button
           className={`autosave-status ${saveStatus}`}
           onClick={() =>
             queue.flushAll().catch((error) => setMessage(error.message))
           }
-          title="点击重试保存"
+          title={t("retrySaveTitle")}
           aria-live="polite"
         >
           {
             {
-              saved: "✓ 已保存",
-              pending: "等待保存…",
-              saving: "正在保存…",
-              error: "保存失败 · 重试",
+              saved: t("savedStatus"),
+              pending: t("waitingSave"),
+              saving: t("savingStatus"),
+              error: t("retrySaveStatus"),
             }[saveStatus]
           }
         </button>
@@ -637,20 +640,20 @@ export default function CanvasPage() {
           className={`sse-indicator ${connection}`}
           title={
             connection === "connected"
-              ? "任务状态实时同步"
-              : "连接中断时任务仍在后端执行"
+              ? t("realtimeTitle")
+              : t("disconnectedTitle")
           }
         >
-          {connection === "connected" ? "● 实时同步" : "○ 正在重连"}
+          {connection === "connected" ? t("realtime") : t("reconnecting")}
         </span>
         <div className="canvas-actions">
           <button onClick={() => setPanel({ type: "queue" })}>
-            任务队列{" "}
+            {t("taskQueue")}{" "}
             {tasks.filter((task) => isRunning(task.status)).length || ""}
           </button>
-          <button onClick={() => leave("/settings")}>设置</button>
-          <button onClick={() => leave("/settings/models")}>模型</button>
-          <button onClick={() => uploadRef.current?.click()}>上传素材</button>
+          <button onClick={() => leave("/settings")}>{t("settings")}</button>
+          <button onClick={() => leave("/settings/models")}>{t("models")}</button>
+          <button onClick={() => uploadRef.current?.click()}>{t("uploadAsset")}</button>
           <input
             ref={uploadRef}
             type="file"
@@ -659,6 +662,7 @@ export default function CanvasPage() {
             onChange={upload}
           />
         </div>
+        <LanguageToggle />
         <ThemeToggle />
         <div className={`ready-dot ${status?.ready ? "ok" : ""}`} />
       </header>
@@ -794,7 +798,7 @@ export default function CanvasPage() {
         <aside className="node-inspector">
           <div className="inspector-head">
             <div>
-              <small>{labels[selectedNode.nodeType]}节点</small>
+              <small>{t("nodeType", { type: labels[selectedNode.nodeType] })}</small>
               <input
                 value={selectedNode.title || ""}
                 onChange={(event) =>
@@ -806,16 +810,16 @@ export default function CanvasPage() {
             <button onClick={() => setSelectedId(null)}>×</button>
           </div>
           <div className="inspector-utilities">
-            <button onClick={() => duplicate(selectedId)}>复制节点</button>
-            <button onClick={() => openHistory(selectedId)}>生成历史</button>
+            <button onClick={() => duplicate(selectedId)}>{t("copyNode")}</button>
+            <button onClick={() => openHistory(selectedId)}>{t("generationHistory")}</button>
             {selectedNode.currentAssetId && (
               <a href={api.downloadURL(selectedNode.currentAssetId)} download>
-                ↓ 下载结果
+                ↓ {t("downloadResult")}
               </a>
             )}
           </div>
           <label>
-            模型
+            {t("model")}
             <select
               value={selectedNode.modelKey || selectedModel?.key || ""}
               onChange={(event) =>
@@ -830,19 +834,19 @@ export default function CanvasPage() {
             </select>
           </label>
           <label>
-            提示词
+            {t("prompt")}
             <textarea
               value={selectedNode.prompt || ""}
               onChange={(event) =>
                 patchLocal(selectedId, { prompt: event.target.value })
               }
               onBlur={() => save(selectedId)}
-              placeholder="描述你想生成的内容…"
+              placeholder={t("promptPlaceholder")}
             />
           </label>
           {selectedModel?.options?.ratio?.length > 0 && (
             <label>
-              画面比例
+              {t("ratio")}
               <select
                 value={selectedParams.ratio || ""}
                 onChange={(event) =>
@@ -857,7 +861,7 @@ export default function CanvasPage() {
           )}
           {selectedModel?.options?.resolution?.length > 0 && (
             <label>
-              清晰度
+              {t("resolution")}
               <select
                 value={selectedParams.resolution || ""}
                 onChange={(event) =>
@@ -872,7 +876,7 @@ export default function CanvasPage() {
           )}
           {selectedModel?.options?.duration?.length > 0 && (
             <label>
-              时长
+              {t("duration")}
               <select
                 value={selectedParams.duration || ""}
                 onChange={(event) =>
@@ -885,7 +889,7 @@ export default function CanvasPage() {
               >
                 {selectedModel.options.duration.map((value) => (
                   <option key={value} value={value}>
-                    {value} 秒
+                    {t("seconds", { value })}
                   </option>
                 ))}
               </select>
@@ -902,10 +906,10 @@ export default function CanvasPage() {
             onClick={() => run(selectedId)}
           >
             {submitting.has(selectedId)
-              ? "正在提交…"
+              ? t("submitting")
               : isRunning(selectedNode.generation?.status)
-                ? "生成处理中…"
-                : "开始生成"}
+                ? t("generating")
+                : t("startGeneration")}
           </button>
           {selectedNode.generation?.status === "failed" && (
             <p className="inspector-error">
@@ -926,7 +930,7 @@ export default function CanvasPage() {
           onLocate={(nodeId) => {
             const key = String(nodeId);
             if (!rawRef.current.has(key)) {
-              setMessage("该节点已被删除，生成记录仍可查看");
+              setMessage(t("deletedNodeHistory"));
               return;
             }
             setSelectedId(key);
@@ -951,7 +955,7 @@ export default function CanvasPage() {
           {contextMenu.mode === "root" ? (
             <>
               <button onClick={() => uploadRef.current?.click()}>
-                上传素材
+                {t("uploadAsset")}
               </button>
               <hr />
               <button
@@ -960,12 +964,12 @@ export default function CanvasPage() {
                   setContextMenu((menu) => ({ ...menu, mode: "types" }))
                 }
               >
-                添加节点 <span>›</span>
+                {t("addNode")} <span>›</span>
               </button>
             </>
           ) : (
             <>
-              <small>选择节点类型</small>
+              <small>{t("selectNodeType")}</small>
               {["video", "image", "text"].map((type) => (
                 <button key={type} onClick={() => selectContextType(type)}>
                   {labels[type]}
@@ -977,7 +981,7 @@ export default function CanvasPage() {
                   setContextMenu((menu) => ({ ...menu, mode: "root" }))
                 }
               >
-                返回
+                {t("back")}
               </button>
             </>
           )}
@@ -996,7 +1000,7 @@ export default function CanvasPage() {
                   setNodeMenu((menu) => ({ ...menu, mode: "rename" }))
                 }
               >
-                重命名
+                {t("rename")}
               </button>
               <button
                 onClick={() => {
@@ -1004,7 +1008,7 @@ export default function CanvasPage() {
                   setNodeMenu((menu) => ({ ...menu, visible: false }));
                 }}
               >
-                复制节点
+                {t("copyNode")}
               </button>
               <button
                 onClick={() => {
@@ -1012,7 +1016,7 @@ export default function CanvasPage() {
                   setNodeMenu((menu) => ({ ...menu, visible: false }));
                 }}
               >
-                生成历史
+                {t("generationHistory")}
               </button>
               <button
                 onClick={() => {
@@ -1020,17 +1024,17 @@ export default function CanvasPage() {
                   setNodeMenu((menu) => ({ ...menu, visible: false }));
                 }}
               >
-                编辑参数
+                {t("editParameters")}
               </button>
               <hr />
               <button
                 className="danger"
                 onClick={() => {
-                  if (confirm("删除这个节点？")) remove(nodeMenu.nodeId);
+                  if (confirm(t("confirmDeleteNode"))) remove(nodeMenu.nodeId);
                   setNodeMenu((menu) => ({ ...menu, visible: false }));
                 }}
               >
-                删除节点
+                {t("deleteNode")}
               </button>
             </>
           ) : (
@@ -1038,7 +1042,7 @@ export default function CanvasPage() {
               onSubmit={(event) => {
                 event.preventDefault();
                 changeAndSave(nodeMenu.nodeId, {
-                  title: nodeMenu.name.trim() || "未命名节点",
+                  title: nodeMenu.name.trim() || t("untitledNode"),
                 });
                 setNodeMenu((menu) => ({ ...menu, visible: false }));
               }}
@@ -1050,7 +1054,7 @@ export default function CanvasPage() {
                   setNodeMenu((menu) => ({ ...menu, name: event.target.value }))
                 }
               />
-              <button className="primary">确定</button>
+              <button className="primary">{t("confirm")}</button>
             </form>
           )}
         </div>
