@@ -80,3 +80,17 @@ test("SSE updates never overwrite draft text, dimensions or layout; saves omit g
   assert.equal("assetId" in nodePayload(merged), false);
   assert.equal("currentAssetId" in nodePayload(merged), false);
 });
+
+test("a completed text task writes its result back only when the submitted instruction is unchanged", () => {
+  const update = {
+    version: 2,
+    generation: {
+      taskType: "text",
+      status: "succeeded",
+      nodePrompt: "write a title",
+      resultText: "A Better Title",
+    },
+  };
+  assert.equal(mergeTaskState({ prompt: "write a title" }, update).prompt, "A Better Title");
+  assert.equal(mergeTaskState({ prompt: "new local draft" }, update).prompt, "new local draft");
+});

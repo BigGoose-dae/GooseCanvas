@@ -316,6 +316,10 @@ func (e *Engine) applyResult(ctx context.Context, task *domain.GenerationTask, s
 		}
 		return
 	}
+	if session.TaskType == "text" {
+		e.completeText(task, session, result)
+		return
+	}
 	payload, _ := json.Marshal(result)
 	if err := e.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(task).Updates(map[string]any{"status": domain.StatusArchiving, "result_payload": string(payload)}).Error; err != nil {
@@ -360,6 +364,44 @@ func (e *Engine) applyResult(ctx context.Context, task *domain.GenerationTask, s
 	} else {
 		e.hub.Notify(session.WorkspaceID)
 	}
+}
+
+func (e *Engine) completeText(task *domain.GenerationTask, session *domain.GenerationSession, result provider.Result) {
+	text := strings.TrimSpace(result.Text)
+	if text == "" {
+		e.fail(task, fmt.Errorf("文本生成完成但未返回文本"))
+		return
+	}
+	now := time.Now()
+	err := e.db.Transaction(func(tx *gorm.DB) error {
+		var node domain.Node
+		if err := tx.First(&node, session.NodeID).Error; err != nil {
+			return err
+		}
+		// Keep an edit made while the model was running. The generated text remains
+		// available in history and is written back only when the instruction is unchanged.
+		if node.Prompt == session.NodePrompt {
+			if err := tx.Model(&node).Updates(map[string]any{"prompt": text, "version": gorm.Expr("version + 1")}).Error; err != nil {
+				return err
+			}
+			if err := tx.First(&node, session.NodeID).Error; err != nil {
+				return err
+			}
+			version := domain.NodeVersion{NodeID: node.ID, Version: node.Version, Prompt: text, ModelKey: session.ModelKey, Params: session.Params}
+			if err := tx.Create(&version).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Model(session).Updates(map[string]any{"status": domain.StatusSucceeded, "result_text": text, "error_message": "", "finished_at": now}).Error; err != nil {
+			return err
+		}
+		return tx.Model(task).Updates(map[string]any{"status": domain.StatusSucceeded, "response_payload": string(result.Raw), "error_message": "", "next_poll_at": nil, "result_payload": ""}).Error
+	})
+	if err != nil {
+		e.fail(task, err)
+		return
+	}
+	e.hub.Notify(session.WorkspaceID)
 }
 
 func (e *Engine) persistResult(ctx context.Context, session domain.GenerationSession, result provider.Result) (domain.Asset, error) {

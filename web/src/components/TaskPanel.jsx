@@ -49,6 +49,12 @@ function GenerationCard({ task, onRetry, onLocate, detailed = false }) {
         #{task.id} · {task.modelKey}
       </small>
       <p className="generation-prompt">{task.prompt}</p>
+      {detailed && task.taskType === "text" && task.resultText && (
+        <div className="history-text">
+          <small>{t("generatedText")}</small>
+          <p>{task.resultText}</p>
+        </div>
+      )}
       {detailed &&
         task.asset &&
         (task.taskType === "video" ? (

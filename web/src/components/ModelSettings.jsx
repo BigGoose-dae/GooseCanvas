@@ -49,13 +49,22 @@ export default function ModelSettings() {
     setForm((current) => ({
       ...current,
       taskType: type,
-      protocol: type === "image" ? "ark-image-v3" : "ark-video-v3",
+      protocol: {
+        text: "ark-chat-v3",
+        image: "ark-image-v3",
+        video: "ark-video-v3",
+      }[type],
+      inputs: type === "text" ? '["text"]' : '["image"]',
       defaults:
-        type === "image"
+        type === "text"
+          ? '{"temperature":0.7,"maxTokens":4096,"thinking":"disabled"}'
+          : type === "image"
           ? '{"ratio":"1:1","resolution":"2K"}'
           : '{"ratio":"16:9","resolution":"720p","duration":5}',
       options:
-        type === "image"
+        type === "text"
+          ? '{"temperature":[0.2,0.7,1],"maxTokens":[1024,2048,4096,8192],"thinking":["disabled","auto","enabled"]}'
+          : type === "image"
           ? '{"ratio":["1:1","16:9","9:16"],"resolution":["1K","2K"]}'
           : '{"ratio":["16:9","9:16","1:1"],"resolution":["720p","1080p"],"duration":[5,10]}',
     }));
@@ -154,7 +163,13 @@ export default function ModelSettings() {
               key={model.id}
             >
               <div className={`model-kind ${model.taskType}`}>
-                {model.taskType === "image" ? t("imageShort") : t("videoShort")}
+                {
+                  {
+                    text: t("textShort"),
+                    image: t("imageShort"),
+                    video: t("videoShort"),
+                  }[model.taskType]
+                }
               </div>
               <div className="model-main">
                 <div>
@@ -213,6 +228,7 @@ export default function ModelSettings() {
                 value={form.taskType}
                 onChange={(e) => changeType(e.target.value)}
               >
+                <option value="text">{t("text")}</option>
                 <option value="image">{t("image")}</option>
                 <option value="video">{t("video")}</option>
               </select>
@@ -233,6 +249,7 @@ export default function ModelSettings() {
               value={form.protocol}
               onChange={(e) => change("protocol", e.target.value)}
             >
+              <option value="ark-chat-v3">{t("arkChatProtocol")}</option>
               <option value="ark-image-v3">{t("arkImageProtocol")}</option>
               <option value="ark-video-v3">{t("arkVideoProtocol")}</option>
             </select>

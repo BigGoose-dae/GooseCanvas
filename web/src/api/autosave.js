@@ -88,11 +88,20 @@ export function nodePayload(node) {
 
 // Task snapshots must never contain editable fields or reset XYFlow interaction state.
 export function mergeTaskState(node, update) {
-  return {
+  const merged = {
     ...node,
     generation: update.generation,
     currentAssetId: update.currentAssetId,
     asset: update.asset,
     version: update.version,
   };
+  if (
+    update.generation?.status === "succeeded" &&
+    update.generation?.taskType === "text" &&
+    update.generation?.resultText &&
+    node.prompt === update.generation.nodePrompt
+  ) {
+    merged.prompt = update.generation.resultText;
+  }
+  return merged;
 }

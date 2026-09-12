@@ -794,7 +794,7 @@ export default function CanvasPage() {
           }}
         />
       </div>
-      {!panel && selectedNode && selectedNode.nodeType !== "text" && (
+      {!panel && selectedNode && (
         <aside className="node-inspector">
           <div className="inspector-head">
             <div>
@@ -834,14 +834,20 @@ export default function CanvasPage() {
             </select>
           </label>
           <label>
-            {t("prompt")}
+            {selectedNode.nodeType === "text"
+              ? t("textInstruction")
+              : t("prompt")}
             <textarea
               value={selectedNode.prompt || ""}
               onChange={(event) =>
                 patchLocal(selectedId, { prompt: event.target.value })
               }
               onBlur={() => save(selectedId)}
-              placeholder={t("promptPlaceholder")}
+              placeholder={
+                selectedNode.nodeType === "text"
+                  ? t("textInstructionPlaceholder")
+                  : t("promptPlaceholder")
+              }
             />
           </label>
           {selectedModel?.options?.ratio?.length > 0 && (
@@ -890,6 +896,59 @@ export default function CanvasPage() {
                 {selectedModel.options.duration.map((value) => (
                   <option key={value} value={value}>
                     {t("seconds", { value })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {selectedModel?.options?.temperature?.length > 0 && (
+            <label>
+              {t("temperature")}
+              <select
+                value={selectedParams.temperature ?? ""}
+                onChange={(event) =>
+                  changeParam(selectedId, "temperature", Number(event.target.value))
+                }
+              >
+                {selectedModel.options.temperature.map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {selectedModel?.options?.maxTokens?.length > 0 && (
+            <label>
+              {t("maxTokens")}
+              <select
+                value={selectedParams.maxTokens ?? ""}
+                onChange={(event) =>
+                  changeParam(selectedId, "maxTokens", Number(event.target.value))
+                }
+              >
+                {selectedModel.options.maxTokens.map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {selectedModel?.options?.thinking?.length > 0 && (
+            <label>
+              {t("thinkingMode")}
+              <select
+                value={selectedParams.thinking || "disabled"}
+                onChange={(event) =>
+                  changeParam(selectedId, "thinking", event.target.value)
+                }
+              >
+                {selectedModel.options.thinking.map((value) => (
+                  <option key={value} value={value}>
+                    {t(
+                      {
+                        disabled: "thinkingDisabled",
+                        auto: "thinkingAuto",
+                        enabled: "thinkingEnabled",
+                      }[value] || value,
+                    )}
                   </option>
                 ))}
               </select>

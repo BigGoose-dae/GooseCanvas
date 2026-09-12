@@ -305,6 +305,7 @@ func (a *API) retryGeneration(c *gin.Context) {
 		result.FinishedAt = nil
 		result.ErrorMessage = ""
 		result.ResultAssetID = nil
+		result.ResultText = ""
 		result.Status = domain.StatusPending
 		if err := tx.Create(&result).Error; err != nil {
 			return err

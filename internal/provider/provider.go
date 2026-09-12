@@ -24,6 +24,7 @@ type Result struct {
 	Done       bool
 	Failed     bool
 	ExternalID string
+	Text       string
 	URL        string
 	Data       []byte
 	MIME       string

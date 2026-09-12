@@ -510,11 +510,11 @@ func (a *API) runNode(c *gin.Context) {
 		a.fail(c, 404, fmt.Errorf("节点不存在"))
 		return
 	}
-	if node.NodeType != "image" && node.NodeType != "video" {
-		a.fail(c, 400, fmt.Errorf("仅图片和视频节点可运行"))
+	if node.NodeType != "text" && node.NodeType != "image" && node.NodeType != "video" {
+		a.fail(c, 400, fmt.Errorf("不支持该节点类型"))
 		return
 	}
-	if a.Store == nil {
+	if node.NodeType != "text" && a.Store == nil {
 		a.fail(c, 503, fmt.Errorf("本地素材目录不可用，无法生成内容"))
 		return
 	}
@@ -531,7 +531,7 @@ func (a *API) runNode(c *gin.Context) {
 		modelQuery = modelQuery.Where("model_key=?", strings.TrimSpace(req.ModelKey))
 	}
 	if err := modelQuery.Order("builtin desc, id asc").First(&model).Error; err != nil {
-		a.fail(c, 400, fmt.Errorf("没有找到可用的%s模型，请先在模型管理中添加并启用", map[string]string{"image": "图片", "video": "视频"}[node.NodeType]))
+		a.fail(c, 400, fmt.Errorf("没有找到可用的%s模型，请先在模型管理中添加并启用", map[string]string{"text": "文本", "image": "图片", "video": "视频"}[node.NodeType]))
 		return
 	}
 	if model.Provider != "volcengine" {
@@ -566,6 +566,9 @@ func (a *API) runNode(c *gin.Context) {
 				}
 				continue
 			}
+			if node.NodeType == "text" {
+				continue
+			}
 			if inputNode.CurrentAssetID == nil {
 				return fmt.Errorf("输入节点 %d 没有素材", inputID)
 			}
@@ -575,7 +578,7 @@ func (a *API) runNode(c *gin.Context) {
 		if combinedPrompt == "" {
 			return fmt.Errorf("提示词不能为空；也可以连接一个有内容的文本节点")
 		}
-		session = domain.GenerationSession{WorkspaceID: node.WorkspaceID, NodeID: node.ID, TaskType: node.NodeType, ModelKey: model.ModelKey, Prompt: combinedPrompt, Params: string(params), Status: domain.StatusPending}
+		session = domain.GenerationSession{WorkspaceID: node.WorkspaceID, NodeID: node.ID, TaskType: node.NodeType, ModelKey: model.ModelKey, Prompt: combinedPrompt, NodePrompt: strings.TrimSpace(req.Prompt), Params: string(params), Status: domain.StatusPending}
 		if err := tx.Create(&session).Error; err != nil {
 			return err
 		}

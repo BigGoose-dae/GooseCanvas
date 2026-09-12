@@ -43,6 +43,45 @@ func TestSubmitImage(t *testing.T) {
 	}
 }
 
+func TestSubmitText(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/chat/completions" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["model"] != "doubao-seed-2-1-pro-260628" || body["stream"] != false {
+			t.Fatalf("request body = %#v", body)
+		}
+		messages, _ := body["messages"].([]any)
+		message, _ := messages[0].(map[string]any)
+		thinking, _ := body["thinking"].(map[string]any)
+		if message["role"] != "user" || message["content"] != "rewrite this" || thinking["type"] != "disabled" {
+			t.Fatalf("text request = %#v", body)
+
+		}
+		if body["temperature"] != 0.7 || body["max_tokens"] != float64(4096) {
+			t.Fatalf("text parameters = %#v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"Rewritten text"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewVolcengine(config.Volcengine{APIKey: "test-key", BaseURL: server.URL})
+	result, err := client.Submit(context.Background(), Request{
+		TaskType: "text", Model: "doubao-seed-2-1-pro-260628", Prompt: "rewrite this",
+		Params: map[string]any{"temperature": 0.7, "maxTokens": 4096, "thinking": "disabled"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Done || result.Text != "Rewritten text" {
+		t.Fatalf("result = %#v", result)
+	}
+}
 func TestSubmitAndPollVideo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

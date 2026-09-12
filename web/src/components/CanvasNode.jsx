@@ -128,6 +128,11 @@ export default function CanvasNode({ id, data, selected }) {
           )}
         </div>
       )}
+      {node.nodeType === "text" && failed && (
+        <div className="workshop-failed" title={generation.errorMessage}>
+          ! {generation.errorMessage || t("generationFailed")}
+        </div>
+      )}
       {selected && (
         <div
           className="node-quick-actions nodrag"
@@ -144,9 +149,7 @@ export default function CanvasNode({ id, data, selected }) {
             }
           </span>
           <button onClick={() => data.copy(id)}>{t("copy")}</button>
-          {node.nodeType !== "text" && (
-            <button onClick={() => data.history(id)}>{t("history")}</button>
-          )}
+          <button onClick={() => data.history(id)}>{t("history")}</button>
           {node.currentAssetId && (
             <a href={api.downloadURL(node.currentAssetId)} download>
               ↓ {t("download")}

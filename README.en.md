@@ -2,14 +2,14 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-Goose Canvas is an open-source, local-first canvas for AI image and video creation. It lets you organize text, image, and video nodes on an infinite canvas, connect assets and prompts into workflows, and generate content with Volcengine Ark models.
+Goose Canvas is an open-source, local-first canvas for AI text, image, and video creation. It lets you organize text, image, and video nodes on an infinite canvas, connect assets and prompts into workflows, and generate content with Volcengine Ark models.
 
 ## Features
 
 - Create and manage multiple creative projects.
 - Add, move, resize, rename, copy, and delete nodes on an infinite canvas.
 - Organize prompts and assets with text, image, and video nodes.
-- Generate images from text or images and videos from text or images.
+- Generate, rewrite, or expand text with Doubao Seed 2.1 Pro, generate images from text or images, and generate videos from text or images.
 - Upload local images and videos and connect them to generation nodes.
 - Autosave node content, positions, and parameters, with browser draft recovery and retry after a failed save.
 - Run multiple generation tasks concurrently in the backend, with each task isolated from the others.
@@ -72,10 +72,10 @@ Open `http://localhost:8080`. The Go service serves both the API and the built W
 
 1. Create a project on the home page.
 2. Open the canvas and add text, image, or video nodes, or upload an asset directly.
-3. Drag from the right handle of an asset or text node to a generation node.
-4. Select the generation node and configure its model, prompt, aspect ratio, resolution, duration, and other parameters.
+3. Enter a writing instruction directly in a text node, or connect upstream text nodes to add context. Asset and text nodes can also feed image and video nodes.
+4. Select a node and configure its model, prompt or text instruction, aspect ratio, resolution, duration, and other parameters.
 5. Select **Start generation**. The task enters the backend queue and its status updates through SSE.
-6. When generation completes, preview or download the result from the node, task queue, or generation history.
+6. When generation completes, view text results in the node or generation history, and preview or download image and video results.
 
 The canvas supports these common controls:
 
@@ -94,10 +94,11 @@ Goose Canvas includes these Volcengine Ark model definitions:
 
 | Type | Display name | Model key | Protocol | Defaults |
 | --- | --- | --- | --- | --- |
+| Text | Doubao Seed 2.1 Pro | `doubao-seed-2-1-pro-260628` | `ark-chat-v3` | `temperature=0.7`, 4096 tokens, thinking disabled |
 | Image | Seedream 5.0 Lite | `doubao-seedream-5-0-lite-260128` | `ark-image-v3` | `1:1`, `2K` |
 | Video | Seedance 2.0 | `doubao-seedance-2-0-260128` | `ark-video-v3` | `16:9`, `720p`, 5 seconds |
 
-The model management page configures a model key, task type, provider, protocol, input types, default parameters, and available options. Goose Canvas currently supports the `volcengine` provider with the `ark-image-v3` and `ark-video-v3` protocols.
+The model management page configures a model key, task type, provider, protocol, input types, default parameters, and available options. Goose Canvas currently supports the `volcengine` provider with the `ark-chat-v3`, `ark-image-v3`, and `ark-video-v3` protocols.
 
 Model availability depends on the models enabled for the corresponding Ark account.
 
@@ -133,7 +134,7 @@ After Web settings have been saved, database configuration takes precedence. `AP
 
 The Go service validates uploaded file types and stores them under `DATA_DIR/assets`. Before calling a model, the backend reads input assets and creates `data:*;base64,...` values. Generation task records do not store Base64 file bodies.
 
-When the image API returns Base64 content, the service decodes and saves it locally. When an image or video API returns a temporary file URL, the service downloads and archives it immediately, so generated results do not depend on provider URLs remaining available.
+Text results are written back to the node and retained in generation history. When the image API returns Base64 content, the service decodes and saves it locally. When an image or video API returns a temporary file URL, the service downloads and archives it immediately, so generated results do not depend on provider URLs remaining available.
 
 The task queue runs up to four requests concurrently by default. Video tasks do not occupy an execution slot while waiting for their next status poll. After a service restart, tasks that can still be queried or archived resume from SQLite.
 

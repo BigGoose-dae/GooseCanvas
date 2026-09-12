@@ -28,6 +28,8 @@ func (v *Volcengine) Submit(ctx context.Context, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("VOLCENGINE_API_KEY is not configured")
 	}
 	switch req.TaskType {
+	case "text":
+		return v.submitText(ctx, req)
 	case "image":
 		return v.submitImage(ctx, req)
 	case "video":
@@ -35,6 +37,54 @@ func (v *Volcengine) Submit(ctx context.Context, req Request) (Result, error) {
 	default:
 		return Result{}, fmt.Errorf("unsupported task type %q", req.TaskType)
 	}
+}
+
+func (v *Volcengine) submitText(ctx context.Context, req Request) (Result, error) {
+	if strings.TrimSpace(req.Model) == "" {
+		return Result{}, fmt.Errorf("model key is required")
+	}
+	prompt := strings.TrimSpace(req.Prompt)
+	if prompt == "" {
+		return Result{}, fmt.Errorf("prompt is required")
+	}
+	thinking := strings.ToLower(stringParam(req.Params, "thinking", "disabled"))
+	if thinking != "enabled" && thinking != "disabled" && thinking != "auto" {
+		return Result{}, fmt.Errorf("thinking must be enabled, disabled, or auto")
+	}
+	body := map[string]any{
+		"model":    req.Model,
+		"messages": []map[string]string{{"role": "user", "content": prompt}},
+		"thinking": map[string]string{"type": thinking},
+		"stream":   false,
+	}
+	if temperature, ok := numberParam(req.Params, "temperature"); ok {
+		if temperature < 0 || temperature > 2 {
+			return Result{}, fmt.Errorf("temperature must be between 0 and 2")
+		}
+		body["temperature"] = temperature
+	}
+	if maxTokens := intParam(req.Params, "maxTokens", 0); maxTokens > 0 {
+		body["max_tokens"] = maxTokens
+	}
+	var payload map[string]any
+	raw, err := v.do(ctx, http.MethodPost, v.cfg.BaseURL+"/api/v3/chat/completions", body, &payload)
+	if err != nil {
+		return Result{}, err
+	}
+	if message := apiError(payload); message != "" {
+		return Result{Failed: true, Error: v.redact(message), Raw: raw}, nil
+	}
+	choices, _ := payload["choices"].([]any)
+	if len(choices) == 0 {
+		return Result{Failed: true, Error: "文本生成完成但未返回文本", Raw: raw}, nil
+	}
+	choice, _ := choices[0].(map[string]any)
+	message, _ := choice["message"].(map[string]any)
+	text := strings.TrimSpace(firstString(message, "content"))
+	if text == "" {
+		return Result{Failed: true, Error: "文本生成完成但未返回文本", Raw: raw}, nil
+	}
+	return Result{Done: true, Text: text, Raw: raw}, nil
 }
 
 func (v *Volcengine) Poll(ctx context.Context, externalID string) (Result, error) {
@@ -230,7 +280,27 @@ func intParam(m map[string]any, key string, fallback int) int {
 	if v, ok := m[key].(int); ok {
 		return v
 	}
+	if v, ok := m[key].(json.Number); ok {
+		if parsed, err := v.Int64(); err == nil {
+			return int(parsed)
+		}
+	}
 	return fallback
+}
+func numberParam(m map[string]any, key string) (float64, bool) {
+	switch value := m[key].(type) {
+	case float64:
+		return value, true
+	case float32:
+		return float64(value), true
+	case int:
+		return float64(value), true
+	case json.Number:
+		parsed, err := value.Float64()
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
 }
 func compact(raw []byte) string {
 	s := strings.TrimSpace(string(raw))

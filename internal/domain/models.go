@@ -74,10 +74,12 @@ type GenerationSession struct {
 	TaskType      string     `gorm:"size:20;not null" json:"taskType"`
 	ModelKey      string     `gorm:"size:120;not null" json:"modelKey"`
 	Prompt        string     `gorm:"type:text" json:"prompt"`
+	NodePrompt    string     `gorm:"type:text" json:"nodePrompt"`
 	Params        string     `gorm:"type:text" json:"params"`
 	Status        string     `gorm:"size:20;index;not null" json:"status"`
 	ErrorMessage  string     `gorm:"type:text" json:"errorMessage,omitempty"`
 	ResultAssetID *uint64    `gorm:"index" json:"resultAssetId,omitempty"`
+	ResultText    string     `gorm:"type:text" json:"resultText,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
 	StartedAt     *time.Time `json:"startedAt,omitempty"`
