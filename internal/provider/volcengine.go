@@ -47,11 +47,10 @@ func (v *Volcengine) Submit(ctx context.Context, req Request) (Result, error) {
 
 func (v *Volcengine) submitAudio(ctx context.Context, req Request) (Result, error) {
 	apiKey := strings.TrimSpace(v.cfg.AudioAPIKey)
-	if apiKey == "" {
-		apiKey = strings.TrimSpace(v.cfg.APIKey)
-	}
-	if apiKey == "" {
-		return Result{}, fmt.Errorf("VOLCENGINE_AUDIO_API_KEY is not configured")
+	appID := strings.TrimSpace(v.cfg.AudioAppID)
+	accessKey := strings.TrimSpace(v.cfg.AudioAccessKey)
+	if apiKey == "" && (appID == "" || accessKey == "") {
+		return Result{}, fmt.Errorf("豆包语音凭证未配置，请填写语音 API Key，或同时填写 App ID 与 Access Key")
 	}
 	prompt := strings.TrimSpace(req.Prompt)
 	if prompt == "" {
@@ -85,7 +84,7 @@ func (v *Volcengine) submitAudio(ctx context.Context, req Request) (Result, erro
 		body["references"] = references
 	}
 	var payload map[string]any
-	raw, err := v.doAudio(ctx, body, apiKey, &payload)
+	raw, err := v.doAudio(ctx, body, apiKey, appID, accessKey, &payload)
 	if err != nil {
 		return Result{}, err
 	}
@@ -107,7 +106,7 @@ func (v *Volcengine) submitAudio(ctx context.Context, req Request) (Result, erro
 	return Result{Failed: true, Error: "豆包音频生成完成但未返回音频", Raw: raw}, nil
 }
 
-func (v *Volcengine) doAudio(ctx context.Context, body any, apiKey string, target any) ([]byte, error) {
+func (v *Volcengine) doAudio(ctx context.Context, body any, apiKey, appID, accessKey string, target any) ([]byte, error) {
 	encoded, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -117,7 +116,12 @@ func (v *Volcengine) doAudio(ctx context.Context, body any, apiKey string, targe
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Api-Key", normalizeCredential(apiKey))
+	if apiKey != "" {
+		req.Header.Set("X-Api-Key", normalizeCredential(apiKey))
+	} else {
+		req.Header.Set("X-Api-App-Id", appID)
+		req.Header.Set("X-Api-Access-Key", accessKey)
+	}
 	req.Header.Set("X-Api-Request-Id", randomRequestID())
 	resp, err := v.http.Do(req)
 	if err != nil {
@@ -519,7 +523,7 @@ func normalizeCredential(secret string) string {
 }
 
 func (v *Volcengine) redact(message string) string {
-	for _, secret := range []string{v.cfg.APIKey, v.cfg.AudioAPIKey} {
+	for _, secret := range []string{v.cfg.APIKey, v.cfg.AudioAPIKey, v.cfg.AudioAppID, v.cfg.AudioAccessKey} {
 		for _, variant := range []string{strings.TrimSpace(secret), normalizeCredential(secret)} {
 			if variant != "" {
 				message = strings.ReplaceAll(message, variant, "[REDACTED]")

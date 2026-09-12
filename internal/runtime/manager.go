@@ -115,6 +115,9 @@ func build(cfg config.Config) (Snapshot, error) {
 	if cfg.Worker.PollInterval <= 0 || cfg.Worker.TaskTimeout < time.Minute {
 		return Snapshot{}, fmt.Errorf("轮询间隔必须为正数，任务超时至少 1 分钟")
 	}
+	if (strings.TrimSpace(cfg.Volc.AudioAppID) == "") != (strings.TrimSpace(cfg.Volc.AudioAccessKey) == "") {
+		return Snapshot{}, fmt.Errorf("豆包语音 App ID 与 Access Key 必须同时配置")
+	}
 	for _, value := range []string{cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint} {
 		parsed, err := url.Parse(value)
 		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {

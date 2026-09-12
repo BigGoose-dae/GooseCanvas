@@ -17,7 +17,7 @@ export default function SystemSettings() {
     api
       .settings()
       .then((data) =>
-        setForm({ ...data, apiKey: "", audioApiKey: "" }),
+        setForm({ ...data, apiKey: "", audioApiKey: "", audioAppId: "", audioAccessKey: "" }),
       )
       .catch((err) => setError(err.message));
   }, []);
@@ -32,7 +32,7 @@ export default function SystemSettings() {
     setSaved("");
     try {
       const data = await api.saveSettings(form);
-      setForm({ ...data, apiKey: "", audioApiKey: "" });
+      setForm({ ...data, apiKey: "", audioApiKey: "", audioAppId: "", audioAccessKey: "" });
       setSaved(t("settingsSaved"));
     } catch (err) {
       setError(err.message);
@@ -126,6 +126,10 @@ export default function SystemSettings() {
               </legend>
               <p>{t("audioApiHelp")}</p>
               {secret("audioApiKey", t("audioApiKey"))}
+              <div className="settings-grid">
+                {secret("audioAppId", t("audioAppId"))}
+                {secret("audioAccessKey", t("audioAccessKey"))}
+              </div>
               <label>
                 {t("audioEndpoint")}
                 <input

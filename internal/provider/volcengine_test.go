@@ -132,6 +132,29 @@ func TestSubmitAudioWithLocalReference(t *testing.T) {
 	}
 }
 
+func TestSubmitAudioWithAppCredentials(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Api-Key") != "" {
+			t.Fatal("unexpected API key header")
+		}
+		if r.Header.Get("X-Api-App-Id") != "audio-app" || r.Header.Get("X-Api-Access-Key") != "audio-access" {
+			t.Fatalf("audio app headers = %#v", r.Header)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"data":{"audio_url":"https://provider.example/generated.mp3"}}`))
+	}))
+	defer server.Close()
+
+	client := NewVolcengine(config.Volcengine{AudioAppID: "audio-app", AudioAccessKey: "audio-access", AudioEndpoint: server.URL})
+	result, err := client.Submit(context.Background(), Request{TaskType: "audio", Prompt: "rain and dialogue"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Done || result.URL != "https://provider.example/generated.mp3" {
+		t.Fatalf("audio result = %#v", result)
+	}
+}
+
 func TestSubmitAndPollVideo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

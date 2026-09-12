@@ -27,6 +27,8 @@ type settingsRequest struct {
 	APIKey         string `json:"apiKey"`
 	AudioEndpoint  string `json:"audioEndpoint"`
 	AudioAPIKey    string `json:"audioApiKey"`
+	AudioAppID     string `json:"audioAppId"`
+	AudioAccessKey string `json:"audioAccessKey"`
 	Concurrency    int    `json:"concurrency"`
 	TimeoutMinutes int    `json:"timeoutMinutes"`
 }
@@ -39,6 +41,7 @@ func (a *API) getSettings(c *gin.Context) {
 		"appName": cfg.AppName, "baseUrl": cfg.Volc.BaseURL,
 		"apiKeyConfigured": cfg.Volc.APIKey != "", "assetDirectory": assetDirectory,
 		"audioEndpoint": cfg.Volc.AudioEndpoint, "audioApiKeyConfigured": cfg.Volc.AudioAPIKey != "",
+		"audioAppIdConfigured": cfg.Volc.AudioAppID != "", "audioAccessKeyConfigured": cfg.Volc.AudioAccessKey != "",
 		"concurrency": cfg.Worker.Concurrency, "timeoutMinutes": int(cfg.Worker.TaskTimeout.Minutes()),
 	})
 }
@@ -75,6 +78,12 @@ func (a *API) saveSettings(c *gin.Context) {
 		}
 		if strings.TrimSpace(req.AudioAPIKey) != "" {
 			cfg.Volc.AudioAPIKey = strings.TrimSpace(req.AudioAPIKey)
+		}
+		if strings.TrimSpace(req.AudioAppID) != "" {
+			cfg.Volc.AudioAppID = strings.TrimSpace(req.AudioAppID)
+		}
+		if strings.TrimSpace(req.AudioAccessKey) != "" {
+			cfg.Volc.AudioAccessKey = strings.TrimSpace(req.AudioAccessKey)
 		}
 		cfg.Worker.Concurrency = req.Concurrency
 		cfg.Worker.TaskTimeout = time.Duration(req.TimeoutMinutes) * time.Minute

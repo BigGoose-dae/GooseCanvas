@@ -110,7 +110,7 @@ Use the `/settings` page to configure:
 - Application name
 - Ark API Key
 - Ark service URL
-- Doubao audio API Key (optional; falls back to the Ark API Key)
+- Doubao audio API Key, or an audio App ID and Access Key
 - Doubao audio service URL
 - Maximum concurrent requests (1–32)
 - Task polling timeout (1–1440 minutes)
@@ -128,7 +128,9 @@ Environment variables can also provide initial configuration:
 | `DATA_DIR` | `./data` | Directory for SQLite, the settings key, and local assets |
 | `VOLCENGINE_API_KEY` | Empty | Volcengine Ark API Key |
 | `VOLCENGINE_BASE_URL` | Ark Beijing endpoint | Ark API base URL |
-| `VOLCENGINE_AUDIO_API_KEY` | Empty | Dedicated Doubao audio API Key; falls back to the Ark key |
+| `VOLCENGINE_AUDIO_API_KEY` | Empty | Dedicated Doubao audio API Key |
+| `VOLCENGINE_AUDIO_APP_ID` | Empty | Doubao audio App ID; configure it together with the Access Key |
+| `VOLCENGINE_AUDIO_ACCESS_KEY` | Empty | Doubao audio Access Key; configure it together with the App ID |
 | `VOLCENGINE_AUDIO_ENDPOINT` | `https://openspeech.bytedance.com/api/v3/tts/create` | Doubao audio generation endpoint |
 | `WORKER_POLL_INTERVAL` | `3s` | Status polling interval for asynchronous video tasks |
 | `WORKER_TASK_TIMEOUT` | `30m` | Polling timeout for asynchronous tasks |

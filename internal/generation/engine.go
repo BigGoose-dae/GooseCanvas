@@ -83,7 +83,7 @@ func (e *Engine) Wait() { e.wg.Wait() }
 
 func (e *Engine) dispatch(ctx context.Context) {
 	snap := e.snapshot()
-	if snap.Store == nil || (strings.TrimSpace(snap.Config.Volc.APIKey) == "" && strings.TrimSpace(snap.Config.Volc.AudioAPIKey) == "") {
+	if snap.Store == nil || (strings.TrimSpace(snap.Config.Volc.APIKey) == "" && !snap.Config.Volc.AudioConfigured()) {
 		return
 	}
 	e.mu.Lock()

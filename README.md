@@ -110,7 +110,7 @@ Goose Canvas 内置以下火山引擎模型定义：
 - 应用名称
 - 方舟 API Key
 - 方舟服务地址
-- 豆包语音 API Key（可选；留空复用方舟 API Key）
+- 豆包语音 API Key，或语音 App ID 与 Access Key
 - 豆包语音服务地址
 - 最大并发请求数（1–32）
 - 任务查询超时（1–1440 分钟）
@@ -128,7 +128,9 @@ Goose Canvas 内置以下火山引擎模型定义：
 | `DATA_DIR` | `./data` | SQLite、配置密钥和本地素材目录 |
 | `VOLCENGINE_API_KEY` | 空 | 火山引擎方舟 API Key |
 | `VOLCENGINE_BASE_URL` | 方舟北京地址 | 方舟 API 根地址 |
-| `VOLCENGINE_AUDIO_API_KEY` | 空 | 豆包语音专用 API Key；为空时复用方舟 Key |
+| `VOLCENGINE_AUDIO_API_KEY` | 空 | 豆包语音专用 API Key |
+| `VOLCENGINE_AUDIO_APP_ID` | 空 | 豆包语音 App ID；需与 Access Key 同时配置 |
+| `VOLCENGINE_AUDIO_ACCESS_KEY` | 空 | 豆包语音 Access Key；需与 App ID 同时配置 |
 | `VOLCENGINE_AUDIO_ENDPOINT` | `https://openspeech.bytedance.com/api/v3/tts/create` | 豆包语音生成地址 |
 | `WORKER_POLL_INTERVAL` | `3s` | 异步视频任务状态查询间隔 |
 | `WORKER_TASK_TIMEOUT` | `30m` | 异步任务查询超时 |

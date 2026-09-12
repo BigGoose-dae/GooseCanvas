@@ -24,10 +24,12 @@ type Config struct {
 }
 
 type Volcengine struct {
-	APIKey        string
-	BaseURL       string
-	AudioAPIKey   string
-	AudioEndpoint string
+	APIKey         string
+	BaseURL        string
+	AudioAPIKey    string
+	AudioAppID     string
+	AudioAccessKey string
+	AudioEndpoint  string
 }
 
 type Worker struct {
@@ -59,10 +61,12 @@ func Load() (Config, error) {
 		DataDir:  dataDir,
 		Database: filepath.Join(dataDir, "goose-canvas.db"),
 		Volc: Volcengine{
-			APIKey:        strings.TrimSpace(os.Getenv("VOLCENGINE_API_KEY")),
-			BaseURL:       strings.TrimRight(env("VOLCENGINE_BASE_URL", "https://ark.cn-beijing.volces.com"), "/"),
-			AudioAPIKey:   strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_API_KEY")),
-			AudioEndpoint: env("VOLCENGINE_AUDIO_ENDPOINT", DefaultAudioEndpoint),
+			APIKey:         strings.TrimSpace(os.Getenv("VOLCENGINE_API_KEY")),
+			BaseURL:        strings.TrimRight(env("VOLCENGINE_BASE_URL", "https://ark.cn-beijing.volces.com"), "/"),
+			AudioAPIKey:    strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_API_KEY")),
+			AudioAppID:     strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_APP_ID")),
+			AudioAccessKey: strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_ACCESS_KEY")),
+			AudioEndpoint:  env("VOLCENGINE_AUDIO_ENDPOINT", DefaultAudioEndpoint),
 		},
 		Worker: Worker{PollInterval: pollInterval, TaskTimeout: taskTimeout, Concurrency: 4},
 	}
@@ -73,10 +77,15 @@ func Load() (Config, error) {
 }
 
 func (c Config) Missing() []string {
-	if strings.TrimSpace(c.Volc.AudioAPIKey) != "" {
+	if c.Volc.AudioConfigured() {
 		return nil
 	}
 	return c.ModelMissing()
+}
+
+func (v Volcengine) AudioConfigured() bool {
+	return strings.TrimSpace(v.AudioAPIKey) != "" ||
+		(strings.TrimSpace(v.AudioAppID) != "" && strings.TrimSpace(v.AudioAccessKey) != "")
 }
 
 func (c Config) ModelMissing() []string {
@@ -107,7 +116,7 @@ func duration(key string, fallback time.Duration) (time.Duration, error) {
 
 // Redact keeps configured credentials out of user-facing errors and logs.
 func (c Config) Redact(message string) string {
-	for _, secret := range []string{c.Volc.APIKey, c.Volc.AudioAPIKey} {
+	for _, secret := range []string{c.Volc.APIKey, c.Volc.AudioAPIKey, c.Volc.AudioAppID, c.Volc.AudioAccessKey} {
 		secret = strings.TrimSpace(secret)
 		variants := []string{secret}
 		if len(secret) >= 7 && strings.EqualFold(secret[:7], "Bearer ") {

@@ -518,7 +518,7 @@ func (a *API) runNode(c *gin.Context) {
 		a.fail(c, 503, fmt.Errorf("本地素材目录不可用，无法生成内容"))
 		return
 	}
-	if node.NodeType == "audio" && strings.TrimSpace(a.Config.Volc.AudioAPIKey) == "" && len(a.Config.ModelMissing()) > 0 {
+	if node.NodeType == "audio" && !a.Config.Volc.AudioConfigured() {
 		a.fail(c, 503, fmt.Errorf("豆包音频 API Key 未配置，无法生成音频"))
 		return
 	}
