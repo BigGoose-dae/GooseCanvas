@@ -7,10 +7,10 @@ A standalone, lightweight AI creation canvas that runs locally. The project cont
 The current version uses:
 
 - SQLite for projects, nodes, edges, asset metadata, and generation tasks, with no separate database installation.
-- Volcengine Ark with Seedream image models and Seedance video models.
+- Volcengine Ark with Seedream 5.0 Lite image generation and Seedance 2.0 video generation.
 - Local directories for uploaded assets and final results. The Go service encodes input files as Base64 when calling a model.
 - React, Vite, and XYFlow for project management and an infinite canvas.
-- A Chinese and English Web interface. The language preference is stored in the current browser.
+- A Chinese and English Web interface. The first visit follows the browser language, and later selections are stored in the current browser.
 
 ## Features
 
@@ -24,9 +24,9 @@ The current version uses:
 - Autosave nodes with visible save status. Failed drafts remain in the browser and can be retried.
 - Copy nodes, browse paginated generation history, preview results, and use explicit download actions.
 - View a project task queue with queued, submitting, generating, archiving, completed, and failed states.
-- Configure model credentials and concurrency in the Web interface, with changes applied immediately.
+- Configure the application name, Ark API Key, Ark service URL, concurrency, and task polling timeout in the Web interface, with changes applied immediately.
 - Store uploads and generated results in the Go service without depending on TOS.
-- Customize branding with `APP_NAME`, `APP_LOGO_URL`, and `APP_REPOSITORY_URL`.
+- Customize the application name, logo, and repository link with `APP_NAME`, `APP_LOGO_URL`, and `APP_REPOSITORY_URL`.
 - Use canvas controls consistent with Workshop: right-click empty space to add, right-drag to pan, left-drag to select, Space plus left-drag to pan, resize nodes, and drag from a node's right handle to empty space to create a downstream node.
 - Manage a SQLite-backed model registry in the Web interface and add models compatible with the Volcengine Ark image and video protocols.
 
@@ -78,15 +78,24 @@ Image and video nodes display only their content on the canvas. Select a node to
 
 Built-in models are initialized in SQLite by [`internal/database/sql/001_seed_models.sql`](internal/database/sql/001_seed_models.sql). Model keys are no longer configured in `.env`. Open **Models** from the home page or canvas to add, edit, enable, disable, or delete custom models.
 
+Database initialization ensures these built-in models exist:
+
+| Type | Display name | Model key | Protocol | Defaults |
+| --- | --- | --- | --- | --- |
+| Image | Seedream 5.0 Lite | `doubao-seedream-5-0-lite-260128` | `ark-image-v3` | `1:1`, `2K` |
+| Video | Seedance 2.0 | `doubao-seedance-2-0-260128` | `ark-video-v3` | `16:9`, `720p`, 5 seconds |
+
 A model record contains its model key, task type, provider, protocol, permitted inputs, default parameters, and available options. The current base version includes the `volcengine` provider adapter. You can add any model enabled for your Ark account that supports the `ark-image-v3` or `ark-video-v3` protocol. Other providers require a corresponding Go adapter.
 
 ## Configuration
 
-Prefer the `/settings` page. Web settings are saved in SQLite and encrypted with AES-GCM. The encryption key is stored separately at `data/.settings.key` with `0600` permissions. Settings APIs report only whether a credential is configured and never return its value. Leaving a password field blank preserves the existing credential.
+Prefer the `/settings` page. It can change the application name, Ark API Key, Ark service URL, maximum concurrent requests (1–32), and task polling timeout (1–1440 minutes). The local asset directory is displayed but cannot be changed on the page. Saved settings apply to subsequent tasks immediately without a restart. Active tasks must finish before the Ark service URL can be changed.
+
+Web settings are saved in SQLite and encrypted with AES-256-GCM. The encryption key is stored separately at `data/.settings.key` with `0600` permissions. Settings APIs report only whether a credential is configured and never return its value. Leaving a password field blank preserves the existing credential.
 
 Plaintext settings from older database versions are encrypted during startup migration. Historical backups are not changed and must be protected separately. Back up both the database and `.settings.key`; credentials cannot be decrypted after restoration without the key. Never upload these files to GitHub, Issues, or public attachments. Encryption protects a database file leaked by itself, but cannot protect a fully compromised machine.
 
-When upgrading from the TOS version, old asset metadata remains in the database, but object files are not migrated automatically. Download any TOS files you need before upgrading. Old assets must be uploaded again before they can be used for generation.
+When upgrading from the TOS version, old asset metadata remains in the database, but object files are not migrated automatically. Download any TOS files you need before upgrading. Old assets must be uploaded again before they can be used for generation. `TOS_*` environment variables are no longer read and can be removed from the local `.env` after the required assets have been migrated.
 
 The environment variables below remain available for initial setup and development compatibility. After settings have been saved in the Web interface, database values take precedence. `APP_ADDR` and `DATA_DIR` always come from the startup environment.
 
@@ -102,7 +111,7 @@ The environment variables below remain available for initial setup and developme
 | `WORKER_POLL_INTERVAL` | `3s` | Polling interval for asynchronous video tasks |
 | `WORKER_TASK_TIMEOUT` | `30m` | Local polling timeout for asynchronous tasks |
 
-Web settings apply without a restart; environment variable changes require one. Do not place real credentials in `.env.example`. SQL logs do not interpolate parameter values, and local environment and database files are restricted to their owner.
+Web settings apply without a restart; environment variable changes require one. After Web settings have been saved, database values for the application name, branding, Ark connection, and worker configuration take precedence over corresponding environment variables. Only `APP_ADDR` and `DATA_DIR` always come from the startup environment. Do not place real credentials in `.env.example`. SQL logs do not interpolate parameter values, and local environment and database files are restricted to their owner.
 
 ## Architecture
 
@@ -114,7 +123,7 @@ React Canvas ── HTTP (save / submit / history / download) ── Go API ─�
                                                               └─ Local archive ── DATA_DIR/assets
 ```
 
-Uploads first pass through the Go service and are written to a local directory. Before image-to-image or image-to-video submission, the backend reads the assets and generates `data:*;base64,...` inputs. Task records do not store Base64 input bodies. When a model returns a temporary URL, the Go service downloads it immediately and writes it atomically into the local directory.
+Uploads first pass through the Go service, which verifies their actual MIME type before writing them to a local directory. Before image-to-image or image-to-video submission, the backend reads the assets and generates `data:*;base64,...` inputs. Task records do not store Base64 input bodies. When the image API returns a Base64 result, the Go service decodes and saves it. When an image or video API returns a temporary URL, the service downloads it immediately and writes it atomically into the local directory.
 
 ## Tasks and recovery
 
@@ -129,6 +138,7 @@ Uploads first pass through the Go service and are written to a local directory. 
 ## Current limitations
 
 - This is a local single-user application without authentication, team permissions, or quotas. Do not expose it directly to the public internet.
+- The default listener is `127.0.0.1:8080`. Setting `APP_ADDR` to `:8080` or another non-loopback address listens on external interfaces and requires your own HTTPS, authentication, and access control.
 - Each uploaded file is limited to 50 MB, and input assets for one generation are limited to 50 MB in total to control Base64 request memory usage.
 - Each generated model result is limited to 2 GB. Temporary URL downloads are written atomically into the local asset directory.
 - Assets stored in TOS by an older release are not migrated automatically and must be uploaded again before reuse.
