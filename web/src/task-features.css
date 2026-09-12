@@ -237,6 +237,10 @@
   background: #0001;
   margin-bottom: 10px;
 }
+.history-audio {
+  height: auto;
+  min-height: 44px;
+}
 .history-text {
   margin: 0 0 10px;
   padding: 10px 12px;

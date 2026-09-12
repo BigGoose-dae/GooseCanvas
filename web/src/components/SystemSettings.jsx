@@ -17,7 +17,7 @@ export default function SystemSettings() {
     api
       .settings()
       .then((data) =>
-        setForm({ ...data, apiKey: "" }),
+        setForm({ ...data, apiKey: "", audioApiKey: "" }),
       )
       .catch((err) => setError(err.message));
   }, []);
@@ -32,7 +32,7 @@ export default function SystemSettings() {
     setSaved("");
     try {
       const data = await api.saveSettings(form);
-      setForm({ ...data, apiKey: "" });
+      setForm({ ...data, apiKey: "", audioApiKey: "" });
       setSaved(t("settingsSaved"));
     } catch (err) {
       setError(err.message);
@@ -122,7 +122,23 @@ export default function SystemSettings() {
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
-                <b>03</b> {t("assetStorage")}
+                <b>03</b> {t("audioGeneration")}
+              </legend>
+              <p>{t("audioApiHelp")}</p>
+              {secret("audioApiKey", t("audioApiKey"))}
+              <label>
+                {t("audioEndpoint")}
+                <input
+                  required
+                  type="url"
+                  value={form.audioEndpoint}
+                  onChange={(event) => change("audioEndpoint", event.target.value)}
+                />
+              </label>
+            </fieldset>
+            <fieldset disabled={busy}>
+              <legend>
+                <b>04</b> {t("assetStorage")}
               </legend>
               <p>{t("storageHelp")}</p>
               <label>
@@ -133,7 +149,7 @@ export default function SystemSettings() {
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
-                <b>04</b> {t("taskExecution")}
+                <b>05</b> {t("taskExecution")}
               </legend>
               <div className="settings-grid">
                 <label>

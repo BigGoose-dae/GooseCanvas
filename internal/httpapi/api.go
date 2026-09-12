@@ -254,8 +254,8 @@ func (a *API) createNode(c *gin.Context) {
 		return
 	}
 	typeName := strings.ToLower(strings.TrimSpace(req.NodeType))
-	if typeName != "text" && typeName != "image" && typeName != "video" {
-		a.fail(c, 400, fmt.Errorf("节点类型仅支持 text/image/video"))
+	if typeName != "text" && typeName != "image" && typeName != "audio" && typeName != "video" {
+		a.fail(c, 400, fmt.Errorf("节点类型仅支持 text/image/audio/video"))
 		return
 	}
 	if req.Params == nil {
@@ -276,7 +276,7 @@ func (a *API) createNode(c *gin.Context) {
 	}
 	node := domain.Node{WorkspaceID: wid, NodeType: typeName, Title: strings.TrimSpace(req.Title), Prompt: req.Prompt, ModelKey: req.ModelKey, Params: string(params), PosX: req.PosX, PosY: req.PosY, Width: req.Width, Height: req.Height, CurrentAssetID: req.AssetID, Version: 1}
 	if node.Title == "" {
-		node.Title = map[string]string{"text": "文本", "image": "图片", "video": "视频"}[typeName]
+		node.Title = map[string]string{"text": "文本", "image": "图片", "audio": "音频", "video": "视频"}[typeName]
 	}
 	if err := a.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&node).Error; err != nil {
@@ -433,7 +433,7 @@ func (a *API) uploadAsset(c *gin.Context) {
 	contentType := http.DetectContentType(probe[:n])
 	kind := assetKind(contentType)
 	if kind == "" {
-		a.fail(c, 400, fmt.Errorf("仅支持图片和视频"))
+		a.fail(c, 400, fmt.Errorf("仅支持图片、音频和视频"))
 		return
 	}
 	key := a.Store.Key("uploads", fmt.Sprint(wid), time.Now().Format("20060102"), fmt.Sprintf("%d%s", time.Now().UnixNano(), safeExt(header)))
@@ -510,7 +510,7 @@ func (a *API) runNode(c *gin.Context) {
 		a.fail(c, 404, fmt.Errorf("节点不存在"))
 		return
 	}
-	if node.NodeType != "text" && node.NodeType != "image" && node.NodeType != "video" {
+	if node.NodeType != "text" && node.NodeType != "image" && node.NodeType != "audio" && node.NodeType != "video" {
 		a.fail(c, 400, fmt.Errorf("不支持该节点类型"))
 		return
 	}
@@ -518,7 +518,11 @@ func (a *API) runNode(c *gin.Context) {
 		a.fail(c, 503, fmt.Errorf("本地素材目录不可用，无法生成内容"))
 		return
 	}
-	if len(a.Config.ModelMissing()) > 0 {
+	if node.NodeType == "audio" && strings.TrimSpace(a.Config.Volc.AudioAPIKey) == "" && len(a.Config.ModelMissing()) > 0 {
+		a.fail(c, 503, fmt.Errorf("豆包音频 API Key 未配置，无法生成音频"))
+		return
+	}
+	if node.NodeType != "audio" && len(a.Config.ModelMissing()) > 0 {
 		a.fail(c, 503, fmt.Errorf("VOLCENGINE_API_KEY 未配置，无法生成内容"))
 		return
 	}
@@ -531,7 +535,7 @@ func (a *API) runNode(c *gin.Context) {
 		modelQuery = modelQuery.Where("model_key=?", strings.TrimSpace(req.ModelKey))
 	}
 	if err := modelQuery.Order("builtin desc, id asc").First(&model).Error; err != nil {
-		a.fail(c, 400, fmt.Errorf("没有找到可用的%s模型，请先在模型管理中添加并启用", map[string]string{"text": "文本", "image": "图片", "video": "视频"}[node.NodeType]))
+		a.fail(c, 400, fmt.Errorf("没有找到可用的%s模型，请先在模型管理中添加并启用", map[string]string{"text": "文本", "image": "图片", "audio": "音频", "video": "视频"}[node.NodeType]))
 		return
 	}
 	if model.Provider != "volcengine" {
@@ -635,6 +639,9 @@ func assetKind(contentType string) string {
 	if strings.HasPrefix(contentType, "video/") {
 		return "video"
 	}
+	if strings.HasPrefix(contentType, "audio/") {
+		return "audio"
+	}
 	return ""
 }
 func safeExt(header *multipart.FileHeader) string {
@@ -642,6 +649,9 @@ func safeExt(header *multipart.FileHeader) string {
 	if len(ext) > 10 || ext == "" {
 		if strings.HasPrefix(header.Header.Get("Content-Type"), "image/") {
 			return ".png"
+		}
+		if strings.HasPrefix(header.Header.Get("Content-Type"), "audio/") {
+			return ".mp3"
 		}
 		return ".mp4"
 	}

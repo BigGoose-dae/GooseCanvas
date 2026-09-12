@@ -12,6 +12,18 @@ WHERE NOT EXISTS (
 INSERT INTO model_definitions
   (model_key, name, task_type, provider, protocol, description, inputs, defaults, options, enabled, builtin, created_at, updated_at)
 SELECT
+  'doubao-seed-audio-1.0-reference', 'Doubao Seed Audio 1.0 Reference', 'audio', 'volcengine', 'doubao-audio-v3',
+  '豆包音频参考音频生成，最多支持 3 段参考音频', '["audio"]',
+  '{"providerModel":"seed-audio-1.0","responseFormat":"mp3","sampleRate":24000,"speechRate":0,"loudnessRate":0,"pitchRate":0}',
+  '{"responseFormat":["mp3","wav"],"sampleRate":[8000,16000,24000,32000,44100,48000],"speechRate":[-50,-25,0,25,50,100],"loudnessRate":[-50,-25,0,25,50,100],"pitchRate":[-12,-6,0,6,12]}',
+  1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (
+  SELECT 1 FROM model_definitions WHERE model_key = 'doubao-seed-audio-1.0-reference'
+);
+
+INSERT INTO model_definitions
+  (model_key, name, task_type, provider, protocol, description, inputs, defaults, options, enabled, builtin, created_at, updated_at)
+SELECT
   'doubao-seedream-5-0-lite-260128', 'Seedream 5.0 Lite', 'image', 'volcengine', 'ark-image-v3',
   '文生图与图生图', '["image"]', '{"ratio":"1:1","resolution":"2K"}',
   '{"ratio":["1:1","2:3","3:2","3:4","4:3","9:16","16:9","21:9"],"resolution":["1K","2K"]}',

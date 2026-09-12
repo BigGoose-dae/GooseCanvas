@@ -64,6 +64,13 @@ function GenerationCard({ task, onRetry, onLocate, detailed = false }) {
             controls
             preload="metadata"
           />
+        ) : task.taskType === "audio" ? (
+          <audio
+            className="history-preview history-audio"
+            src={task.asset.url}
+            controls
+            preload="metadata"
+          />
         ) : (
           <a href={task.asset.url} target="_blank" rel="noreferrer">
             <img

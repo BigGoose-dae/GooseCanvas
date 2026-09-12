@@ -26,7 +26,7 @@ export default function CanvasPage() {
   const { id } = useParams();
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const labels = { text: t("text"), image: t("image"), video: t("video") };
+  const labels = { text: t("text"), image: t("image"), audio: t("audio"), video: t("video") };
   const navigate = useNavigate();
   const {
     queue,
@@ -578,7 +578,11 @@ export default function CanvasPage() {
     try {
       setMessage(t("uploading"));
       const asset = await api.upload(id, file),
-        type = file.type.startsWith("image/") ? "image" : "video",
+        type = file.type.startsWith("image/")
+          ? "image"
+          : file.type.startsWith("audio/")
+            ? "audio"
+            : "video",
         point = Number.isFinite(contextMenu.flowX)
           ? { x: contextMenu.flowX, y: contextMenu.flowY }
           : { x: 160, y: 140 };
@@ -657,7 +661,7 @@ export default function CanvasPage() {
           <input
             ref={uploadRef}
             type="file"
-            accept="image/*,video/*"
+            accept="image/*,audio/*,video/*"
             hidden
             onChange={upload}
           />
@@ -954,6 +958,30 @@ export default function CanvasPage() {
               </select>
             </label>
           )}
+          {["responseFormat", "sampleRate", "speechRate", "loudnessRate", "pitchRate"].map(
+            (parameter) =>
+              selectedModel?.options?.[parameter]?.length > 0 && (
+                <label key={parameter}>
+                  {t(parameter)}
+                  <select
+                    value={selectedParams[parameter] ?? ""}
+                    onChange={(event) =>
+                      changeParam(
+                        selectedId,
+                        parameter,
+                        parameter === "responseFormat"
+                          ? event.target.value
+                          : Number(event.target.value),
+                      )
+                    }
+                  >
+                    {selectedModel.options[parameter].map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              ),
+          )}
           <button
             className="inspector-run"
             disabled={
@@ -1029,7 +1057,7 @@ export default function CanvasPage() {
           ) : (
             <>
               <small>{t("selectNodeType")}</small>
-              {["video", "image", "text"].map((type) => (
+              {["video", "image", "audio", "text"].map((type) => (
                 <button key={type} onClick={() => selectContextType(type)}>
                   {labels[type]}
                 </button>

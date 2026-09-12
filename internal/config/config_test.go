@@ -19,4 +19,10 @@ func TestMissingIsStableAndSeparated(t *testing.T) {
 	if len(cfg.ModelMissing()) != 0 {
 		t.Fatalf("ModelMissing() = %v, want empty", cfg.ModelMissing())
 	}
+
+	cfg.Volc.APIKey = ""
+	cfg.Volc.AudioAPIKey = "audio-only"
+	if len(cfg.Missing()) != 0 || len(cfg.ModelMissing()) == 0 {
+		t.Fatalf("audio credential should make audio tasks ready without satisfying Ark model requirements")
+	}
 }

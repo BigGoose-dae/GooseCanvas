@@ -83,7 +83,7 @@ func (e *Engine) Wait() { e.wg.Wait() }
 
 func (e *Engine) dispatch(ctx context.Context) {
 	snap := e.snapshot()
-	if snap.Store == nil || len(snap.Config.Missing()) != 0 {
+	if snap.Store == nil || (strings.TrimSpace(snap.Config.Volc.APIKey) == "" && strings.TrimSpace(snap.Config.Volc.AudioAPIKey) == "") {
 		return
 	}
 	e.mu.Lock()
@@ -487,6 +487,7 @@ func extension(contentType, taskType string) string {
 	if known := map[string]string{
 		"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
 		"image/gif": ".gif", "video/mp4": ".mp4", "video/webm": ".webm",
+		"audio/mpeg": ".mp3", "audio/wav": ".wav", "audio/pcm": ".pcm", "audio/ogg": ".ogg",
 	}[mediaType]; known != "" {
 		return known
 	}
@@ -495,6 +496,9 @@ func extension(contentType, taskType string) string {
 	}
 	if taskType == "image" {
 		return ".png"
+	}
+	if taskType == "audio" {
+		return ".mp3"
 	}
 	return ".mp4"
 }

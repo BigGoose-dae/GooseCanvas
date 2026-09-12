@@ -2,15 +2,15 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-Goose Canvas is an open-source, local-first canvas for AI text, image, and video creation. It lets you organize text, image, and video nodes on an infinite canvas, connect assets and prompts into workflows, and generate content with Volcengine Ark models.
+Goose Canvas is an open-source, local-first canvas for AI text, image, audio, and video creation. It lets you organize text, image, audio, and video nodes on an infinite canvas, connect assets and prompts into workflows, and generate content with Volcengine models.
 
 ## Features
 
 - Create and manage multiple creative projects.
 - Add, move, resize, rename, copy, and delete nodes on an infinite canvas.
-- Organize prompts and assets with text, image, and video nodes.
-- Generate, rewrite, or expand text with Doubao Seed 2.1 Pro, generate images from text or images, and generate videos from text or images.
-- Upload local images and videos and connect them to generation nodes.
+- Organize prompts and assets with text, image, audio, and video nodes.
+- Generate, rewrite, or expand text with Doubao Seed 2.1 Pro, generate images from text or images, generate audio from reference clips, and generate videos from text or images.
+- Upload local images, audio, and videos and connect them to generation nodes. Audio nodes accept up to three reference clips.
 - Autosave node content, positions, and parameters, with browser draft recovery and retry after a failed save.
 - Run multiple generation tasks concurrently in the backend, with each task isolated from the others.
 - Stream queued, submitting, generating, archiving, completed, and failed states through SSE.
@@ -27,7 +27,7 @@ Goose Canvas does not provide task cancellation. After a task has been submitted
 - React, Vite, and XYFlow
 - SQLite
 - Server-Sent Events (SSE)
-- Volcengine Ark API
+- Volcengine APIs
 
 SQLite stores projects, nodes, edges, asset metadata, model definitions, and generation tasks. Uploaded assets and generated results are stored in local directories.
 
@@ -35,7 +35,7 @@ SQLite stores projects, nodes, edges, asset metadata, model definitions, and gen
 
 - Go 1.23+
 - Node.js 18+
-- A valid Volcengine Ark API Key
+- A valid Volcengine Ark API Key; a dedicated audio credential can also be configured
 
 ## Quick start
 
@@ -71,11 +71,11 @@ Open `http://localhost:8080`. The Go service serves both the API and the built W
 ## Usage
 
 1. Create a project on the home page.
-2. Open the canvas and add text, image, or video nodes, or upload an asset directly.
-3. Enter a writing instruction directly in a text node, or connect upstream text nodes to add context. Asset and text nodes can also feed image and video nodes.
+2. Open the canvas and add text, image, audio, or video nodes, or upload an asset directly.
+3. Enter a writing instruction directly in a text node, or connect upstream text nodes to add context. Asset and text nodes can also feed image, audio, and video nodes.
 4. Select a node and configure its model, prompt or text instruction, aspect ratio, resolution, duration, and other parameters.
 5. Select **Start generation**. The task enters the backend queue and its status updates through SSE.
-6. When generation completes, view text results in the node or generation history, and preview or download image and video results.
+6. When generation completes, view text results in the node or generation history, and preview or download image, audio, and video results.
 
 The canvas supports these common controls:
 
@@ -90,17 +90,18 @@ Copying a node keeps its content and current asset, but does not copy edges or s
 
 ## Model management
 
-Goose Canvas includes these Volcengine Ark model definitions:
+Goose Canvas includes these Volcengine model definitions:
 
 | Type | Display name | Model key | Protocol | Defaults |
 | --- | --- | --- | --- | --- |
 | Text | Doubao Seed 2.1 Pro | `doubao-seed-2-1-pro-260628` | `ark-chat-v3` | `temperature=0.7`, 4096 tokens, thinking disabled |
+| Audio | Doubao Seed Audio 1.0 Reference | `doubao-seed-audio-1.0-reference` | `doubao-audio-v3` | `mp3`, 24 kHz, standard speech/loudness/pitch |
 | Image | Seedream 5.0 Lite | `doubao-seedream-5-0-lite-260128` | `ark-image-v3` | `1:1`, `2K` |
 | Video | Seedance 2.0 | `doubao-seedance-2-0-260128` | `ark-video-v3` | `16:9`, `720p`, 5 seconds |
 
-The model management page configures a model key, task type, provider, protocol, input types, default parameters, and available options. Goose Canvas currently supports the `volcengine` provider with the `ark-chat-v3`, `ark-image-v3`, and `ark-video-v3` protocols.
+The model management page configures a model key, task type, provider, protocol, input types, default parameters, and available options. Goose Canvas currently supports the `volcengine` provider with the `ark-chat-v3`, `ark-image-v3`, `doubao-audio-v3`, and `ark-video-v3` protocols.
 
-Model availability depends on the models enabled for the corresponding Ark account.
+Model availability depends on the models enabled for the corresponding Volcengine account.
 
 ## Settings
 
@@ -109,6 +110,8 @@ Use the `/settings` page to configure:
 - Application name
 - Ark API Key
 - Ark service URL
+- Doubao audio API Key (optional; falls back to the Ark API Key)
+- Doubao audio service URL
 - Maximum concurrent requests (1–32)
 - Task polling timeout (1–1440 minutes)
 
@@ -125,6 +128,8 @@ Environment variables can also provide initial configuration:
 | `DATA_DIR` | `./data` | Directory for SQLite, the settings key, and local assets |
 | `VOLCENGINE_API_KEY` | Empty | Volcengine Ark API Key |
 | `VOLCENGINE_BASE_URL` | Ark Beijing endpoint | Ark API base URL |
+| `VOLCENGINE_AUDIO_API_KEY` | Empty | Dedicated Doubao audio API Key; falls back to the Ark key |
+| `VOLCENGINE_AUDIO_ENDPOINT` | `https://openspeech.bytedance.com/api/v3/tts/create` | Doubao audio generation endpoint |
 | `WORKER_POLL_INTERVAL` | `3s` | Status polling interval for asynchronous video tasks |
 | `WORKER_TASK_TIMEOUT` | `30m` | Polling timeout for asynchronous tasks |
 
@@ -134,7 +139,7 @@ After Web settings have been saved, database configuration takes precedence. `AP
 
 The Go service validates uploaded file types and stores them under `DATA_DIR/assets`. Before calling a model, the backend reads input assets and creates `data:*;base64,...` values. Generation task records do not store Base64 file bodies.
 
-Text results are written back to the node and retained in generation history. When the image API returns Base64 content, the service decodes and saves it locally. When an image or video API returns a temporary file URL, the service downloads and archives it immediately, so generated results do not depend on provider URLs remaining available.
+Text results are written back to the node and retained in generation history. When an image or audio API returns Base64 content, the service decodes and saves it locally. When an image, audio, or video API returns a temporary file URL, the service downloads and archives it immediately, so generated results do not depend on provider URLs remaining available.
 
 The task queue runs up to four requests concurrently by default. Video tasks do not occupy an execution slot while waiting for their next status poll. After a service restart, tasks that can still be queried or archived resume from SQLite.
 
@@ -146,7 +151,7 @@ A timed-out task can continue querying the original provider task, and a failed 
 React Canvas ── HTTP (save / submit / history / download) ── Go API ── SQLite
       ▲                                                       │
       └──────── SSE (status / result snapshots) ───────────────┤
-                                                              ├─ Concurrent tasks ── Ark (Base64 input)
+                                                              ├─ Concurrent tasks ── Volcengine (Base64 input)
                                                               └─ Local archive ── DATA_DIR/assets
 ```
 

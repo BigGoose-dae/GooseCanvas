@@ -54,23 +54,24 @@ func jsonCall(t *testing.T, r http.Handler, method, path string, body any) *http
 
 func TestSettingsPersistWithoutReturningSecrets(t *testing.T) {
 	a, r := featureAPI(t)
-	body := settingsRequest{AppName: "Friendly Canvas", BaseURL: "https://ark.example.invalid", APIKey: "private-api-key", Concurrency: 6, TimeoutMinutes: 45}
+	body := settingsRequest{AppName: "Friendly Canvas", BaseURL: "https://ark.example.invalid", APIKey: "private-api-key", AudioEndpoint: "https://speech.example.invalid/api/v3/tts/create", AudioAPIKey: "private-audio-key", Concurrency: 6, TimeoutMinutes: 45}
 	response := jsonCall(t, r, "PUT", "/api/v1/settings", body)
 	if response.Code != 200 {
 		t.Fatalf("settings: %d %s", response.Code, response.Body.String())
 	}
 	var stored domain.SystemSetting
 	a.DB.First(&stored, 1)
-	if !strings.HasPrefix(stored.Value, "aesgcm:v1:") || strings.Contains(stored.Value, "private-api-key") {
+	if !strings.HasPrefix(stored.Value, "aesgcm:v1:") || strings.Contains(stored.Value, "private-api-key") || strings.Contains(stored.Value, "private-audio-key") {
 		t.Fatal("configuration stored without encryption")
 	}
 	body.APIKey = ""
+	body.AudioAPIKey = ""
 	body.Concurrency = 3
 	if result := jsonCall(t, r, "PUT", "/api/v1/settings", body); result.Code != 200 {
 		t.Fatal(result.Body.String())
 	}
 	read := jsonCall(t, r, "GET", "/api/v1/settings", nil)
-	for _, secret := range []string{"private-api-key"} {
+	for _, secret := range []string{"private-api-key", "private-audio-key"} {
 		if strings.Contains(read.Body.String(), secret) {
 			t.Fatal("secret leaked in settings response")
 		}
@@ -80,7 +81,7 @@ func TestSettingsPersistWithoutReturningSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := restarted.Snapshot().Config
-	if cfg.Volc.APIKey != "private-api-key" || cfg.Worker.Concurrency != 3 {
+	if cfg.Volc.APIKey != "private-api-key" || cfg.Volc.AudioAPIKey != "private-audio-key" || cfg.Volc.AudioEndpoint != body.AudioEndpoint || cfg.Worker.Concurrency != 3 {
 		t.Fatal("settings or retained secrets lost on restart")
 	}
 	body.Concurrency = 0

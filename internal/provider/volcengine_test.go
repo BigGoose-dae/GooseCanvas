@@ -82,6 +82,56 @@ func TestSubmitText(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 }
+
+func TestSubmitAudioWithLocalReference(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v3/tts/create" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("X-Api-Key") != "audio-key" || r.Header.Get("X-Api-Request-Id") == "" {
+			t.Fatalf("audio headers = %#v", r.Header)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["model"] != "seed-audio-1.0" || body["text_prompt"] != "warm narration" {
+			t.Fatalf("audio request = %#v", body)
+		}
+		references, _ := body["references"].([]any)
+		if len(references) != 1 {
+			t.Fatalf("audio references = %#v", body["references"])
+		}
+		reference, _ := references[0].(map[string]any)
+		if reference["audio_url"] != "data:audio/mpeg;base64,cmVmZXJlbmNl" {
+			t.Fatalf("audio references = %#v", body["references"])
+		}
+		config, _ := body["audio_config"].(map[string]any)
+		if config["format"] != "mp3" || config["sample_rate"] != float64(24000) || config["speech_rate"] != float64(25) {
+			t.Fatalf("audio config = %#v", config)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"data":{"audio":"data:audio/mpeg;base64,Z2VuZXJhdGVkLWF1ZGlv"}}`))
+	}))
+	defer server.Close()
+
+	client := NewVolcengine(config.Volcengine{AudioAPIKey: "bearer audio-key", AudioEndpoint: server.URL + "/api/v3/tts/create"})
+	result, err := client.Submit(context.Background(), Request{
+		TaskType: "audio", Prompt: "warm narration",
+		Params: map[string]any{"providerModel": "seed-audio-1.0", "responseFormat": "mp3", "sampleRate": 24000, "speechRate": 25},
+		Inputs: []Input{{Type: "audio", DataURI: "data:audio/mpeg;base64,cmVmZXJlbmNl"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Done || string(result.Data) != "generated-audio" || result.MIME != "audio/mpeg" {
+		t.Fatalf("audio result = %#v", result)
+	}
+	if len(result.Raw) != 0 {
+		t.Fatal("base64 audio response must not be retained in task payload")
+	}
+}
+
 func TestSubmitAndPollVideo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -141,5 +191,20 @@ func TestProviderErrorRedactsCredential(t *testing.T) {
 	var response *HTTPError
 	if !errors.As(err, &response) || response.Status != 401 {
 		t.Fatal("provider rejection was not classified")
+	}
+}
+
+func TestAudioProviderErrorRedactsBearerCredential(t *testing.T) {
+	secret := "fixture-audio-secret-that-must-not-be-logged"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"message":"Rejected ` + secret + `"}`))
+	}))
+	defer server.Close()
+
+	client := NewVolcengine(config.Volcengine{AudioAPIKey: "Bearer " + secret, AudioEndpoint: server.URL})
+	_, err := client.Submit(context.Background(), Request{TaskType: "audio", Prompt: "test"})
+	if err == nil || strings.Contains(err.Error(), secret) || !strings.Contains(err.Error(), "[REDACTED]") {
+		t.Fatal("audio provider error leaked credential")
 	}
 }

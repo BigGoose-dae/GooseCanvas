@@ -10,6 +10,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const DefaultAudioEndpoint = "https://openspeech.bytedance.com/api/v3/tts/create"
+
 type Config struct {
 	AppName  string
 	LogoURL  string
@@ -22,8 +24,10 @@ type Config struct {
 }
 
 type Volcengine struct {
-	APIKey  string
-	BaseURL string
+	APIKey        string
+	BaseURL       string
+	AudioAPIKey   string
+	AudioEndpoint string
 }
 
 type Worker struct {
@@ -55,8 +59,10 @@ func Load() (Config, error) {
 		DataDir:  dataDir,
 		Database: filepath.Join(dataDir, "goose-canvas.db"),
 		Volc: Volcengine{
-			APIKey:  strings.TrimSpace(os.Getenv("VOLCENGINE_API_KEY")),
-			BaseURL: strings.TrimRight(env("VOLCENGINE_BASE_URL", "https://ark.cn-beijing.volces.com"), "/"),
+			APIKey:        strings.TrimSpace(os.Getenv("VOLCENGINE_API_KEY")),
+			BaseURL:       strings.TrimRight(env("VOLCENGINE_BASE_URL", "https://ark.cn-beijing.volces.com"), "/"),
+			AudioAPIKey:   strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_API_KEY")),
+			AudioEndpoint: env("VOLCENGINE_AUDIO_ENDPOINT", DefaultAudioEndpoint),
 		},
 		Worker: Worker{PollInterval: pollInterval, TaskTimeout: taskTimeout, Concurrency: 4},
 	}
@@ -67,6 +73,9 @@ func Load() (Config, error) {
 }
 
 func (c Config) Missing() []string {
+	if strings.TrimSpace(c.Volc.AudioAPIKey) != "" {
+		return nil
+	}
 	return c.ModelMissing()
 }
 
@@ -98,9 +107,16 @@ func duration(key string, fallback time.Duration) (time.Duration, error) {
 
 // Redact keeps configured credentials out of user-facing errors and logs.
 func (c Config) Redact(message string) string {
-	for _, secret := range []string{c.Volc.APIKey} {
-		if secret != "" {
-			message = strings.ReplaceAll(message, secret, "[REDACTED]")
+	for _, secret := range []string{c.Volc.APIKey, c.Volc.AudioAPIKey} {
+		secret = strings.TrimSpace(secret)
+		variants := []string{secret}
+		if len(secret) >= 7 && strings.EqualFold(secret[:7], "Bearer ") {
+			variants = append(variants, strings.TrimSpace(secret[7:]))
+		}
+		for _, variant := range variants {
+			if variant != "" {
+				message = strings.ReplaceAll(message, variant, "[REDACTED]")
+			}
 		}
 	}
 	return message

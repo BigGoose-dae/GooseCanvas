@@ -3,11 +3,14 @@ package provider
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +27,9 @@ func NewVolcengine(cfg config.Volcengine) *Volcengine {
 }
 
 func (v *Volcengine) Submit(ctx context.Context, req Request) (Result, error) {
+	if req.TaskType == "audio" {
+		return v.submitAudio(ctx, req)
+	}
 	if strings.TrimSpace(v.cfg.APIKey) == "" {
 		return Result{}, fmt.Errorf("VOLCENGINE_API_KEY is not configured")
 	}
@@ -37,6 +43,200 @@ func (v *Volcengine) Submit(ctx context.Context, req Request) (Result, error) {
 	default:
 		return Result{}, fmt.Errorf("unsupported task type %q", req.TaskType)
 	}
+}
+
+func (v *Volcengine) submitAudio(ctx context.Context, req Request) (Result, error) {
+	apiKey := strings.TrimSpace(v.cfg.AudioAPIKey)
+	if apiKey == "" {
+		apiKey = strings.TrimSpace(v.cfg.APIKey)
+	}
+	if apiKey == "" {
+		return Result{}, fmt.Errorf("VOLCENGINE_AUDIO_API_KEY is not configured")
+	}
+	prompt := strings.TrimSpace(req.Prompt)
+	if prompt == "" {
+		return Result{}, fmt.Errorf("audio prompt is required")
+	}
+	format := normalizeAudioFormat(stringParam(req.Params, "responseFormat", "mp3"))
+	if format == "" {
+		return Result{}, fmt.Errorf("audio response format must be mp3, wav, pcm, or ogg_opus")
+	}
+	references := make([]map[string]string, 0, 3)
+	for _, input := range req.Inputs {
+		if input.Type == "audio" && input.DataURI != "" {
+			if len(references) == 3 {
+				return Result{}, fmt.Errorf("doubao seed audio supports at most 3 reference audios")
+			}
+			references = append(references, map[string]string{"audio_url": input.DataURI})
+		}
+	}
+	body := map[string]any{
+		"model":       stringParam(req.Params, "providerModel", "seed-audio-1.0"),
+		"text_prompt": prompt,
+		"audio_config": map[string]any{
+			"format": format, "sample_rate": intParam(req.Params, "sampleRate", 24000),
+			"speech_rate":   clampInt(intParam(req.Params, "speechRate", 0), -50, 100),
+			"loudness_rate": clampInt(intParam(req.Params, "loudnessRate", 0), -50, 100),
+			"pitch_rate":    clampInt(intParam(req.Params, "pitchRate", 0), -12, 12),
+		},
+		"watermark": map[string]any{},
+	}
+	if len(references) > 0 {
+		body["references"] = references
+	}
+	var payload map[string]any
+	raw, err := v.doAudio(ctx, body, apiKey, &payload)
+	if err != nil {
+		return Result{}, err
+	}
+	if code := numericCode(payload["code"]); code != 0 {
+		return Result{Failed: true, Error: v.redact(errorMessage(payload, fmt.Sprintf("豆包音频生成失败，code=%d", code))), Raw: raw}, nil
+	}
+	if outputURL := deepString(payload, isURL, "audio_url", "audioUrl", "url", "output_url", "file_url", "content"); outputURL != "" {
+		return Result{Done: true, URL: outputURL, MIME: audioMIME(format), Raw: raw}, nil
+	}
+	encoded := deepString(payload, isAudioBase64, "audio", "data", "audio_base64", "audioBase64", "base64", "b64_json")
+	if encoded != "" {
+		decoded, err := decodeAudio(encoded)
+		if err != nil {
+			return Result{}, err
+		}
+		// Do not persist a potentially large Base64 response in the task record.
+		return Result{Done: true, Data: decoded, MIME: audioMIME(format)}, nil
+	}
+	return Result{Failed: true, Error: "豆包音频生成完成但未返回音频", Raw: raw}, nil
+}
+
+func (v *Volcengine) doAudio(ctx context.Context, body any, apiKey string, target any) ([]byte, error) {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, v.cfg.AudioEndpoint, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Api-Key", normalizeCredential(apiKey))
+	req.Header.Set("X-Api-Request-Id", randomRequestID())
+	resp, err := v.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request volcengine audio: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 256<<20))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return raw, &HTTPError{Status: resp.StatusCode, Message: v.redact(compact(raw))}
+	}
+	if err := json.Unmarshal(raw, target); err != nil {
+		return raw, fmt.Errorf("decode volcengine audio response: %w", err)
+	}
+	return raw, nil
+}
+
+func normalizeAudioFormat(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "mp3", "wav", "pcm", "ogg_opus":
+		return strings.ToLower(strings.TrimSpace(raw))
+	case "mpeg":
+		return "mp3"
+	case "wave":
+		return "wav"
+	case "ogg", "opus":
+		return "ogg_opus"
+	default:
+		return ""
+	}
+}
+
+func audioMIME(format string) string {
+	return map[string]string{"mp3": "audio/mpeg", "wav": "audio/wav", "pcm": "audio/pcm", "ogg_opus": "audio/ogg"}[format]
+}
+
+func decodeAudio(raw string) ([]byte, error) {
+	if idx := strings.Index(raw, ","); strings.HasPrefix(raw, "data:audio/") && idx >= 0 {
+		raw = raw[idx+1:]
+	}
+	return base64.StdEncoding.DecodeString(raw)
+}
+
+func randomRequestID() string {
+	var value [16]byte
+	if _, err := rand.Read(value[:]); err != nil {
+		return fmt.Sprint(time.Now().UnixNano())
+	}
+	return hex.EncodeToString(value[:])
+}
+
+func clampInt(value, minimum, maximum int) int {
+	if value < minimum {
+		return minimum
+	}
+	if value > maximum {
+		return maximum
+	}
+	return value
+}
+
+func numericCode(value any) int {
+	switch typed := value.(type) {
+	case float64:
+		return int(typed)
+	case int:
+		return typed
+	case json.Number:
+		parsed, _ := strconv.Atoi(typed.String())
+		return parsed
+	case string:
+		parsed, _ := strconv.Atoi(strings.TrimSpace(typed))
+		return parsed
+	default:
+		return 0
+	}
+}
+
+func isURL(value string) bool {
+	return strings.HasPrefix(value, "https://") || strings.HasPrefix(value, "http://")
+}
+
+func isAudioBase64(value string) bool {
+	return strings.HasPrefix(value, "data:audio/") || (!isURL(value) && len(value) > 64)
+}
+
+func deepString(value any, accept func(string) bool, keys ...string) string {
+	wanted := map[string]bool{}
+	for _, key := range keys {
+		wanted[key] = true
+	}
+	var visit func(any) string
+	visit = func(current any) string {
+		switch typed := current.(type) {
+		case map[string]any:
+			for key, child := range typed {
+				if wanted[key] {
+					if text, ok := child.(string); ok && accept(strings.TrimSpace(text)) {
+						return strings.TrimSpace(text)
+					}
+				}
+			}
+			for _, child := range typed {
+				if found := visit(child); found != "" {
+					return found
+				}
+			}
+		case []any:
+			for _, child := range typed {
+				if found := visit(child); found != "" {
+					return found
+				}
+			}
+		}
+		return ""
+	}
+	return visit(value)
 }
 
 func (v *Volcengine) submitText(ctx context.Context, req Request) (Result, error) {
@@ -310,9 +510,21 @@ func compact(raw []byte) string {
 	return s
 }
 
+func normalizeCredential(secret string) string {
+	secret = strings.TrimSpace(secret)
+	if len(secret) >= 7 && strings.EqualFold(secret[:7], "Bearer ") {
+		return strings.TrimSpace(secret[7:])
+	}
+	return secret
+}
+
 func (v *Volcengine) redact(message string) string {
-	if v.cfg.APIKey != "" {
-		return strings.ReplaceAll(message, v.cfg.APIKey, "[REDACTED]")
+	for _, secret := range []string{v.cfg.APIKey, v.cfg.AudioAPIKey} {
+		for _, variant := range []string{strings.TrimSpace(secret), normalizeCredential(secret)} {
+			if variant != "" {
+				message = strings.ReplaceAll(message, variant, "[REDACTED]")
+			}
+		}
 	}
 	return message
 }

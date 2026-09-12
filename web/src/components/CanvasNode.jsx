@@ -3,11 +3,11 @@ import { Handle, Position } from "@xyflow/react";
 import { api } from "../api/client";
 import { useLanguage } from "../i18n/LanguageContext";
 
-const icons = { text: "T", image: "▧", video: "▶" };
+const icons = { text: "T", image: "▧", audio: "♫", video: "▶" };
 
 export default function CanvasNode({ id, data, selected }) {
   const { t } = useLanguage();
-  const labels = { text: t("text"), image: t("image"), video: t("video") };
+  const labels = { text: t("text"), image: t("image"), audio: t("audio"), video: t("video") };
   const node = data.node;
   const generation = node.generation;
   const running = ["pending", "submitting", "processing", "archiving"].includes(
@@ -77,6 +77,15 @@ export default function CanvasNode({ id, data, selected }) {
               src={node.asset.url}
               alt={node.title || t("image")}
               draggable="false"
+            />
+          )}
+          {node.asset?.url && node.nodeType === "audio" && (
+            <audio
+              src={node.asset.url}
+              controls
+              preload="metadata"
+              className="nowheel"
+              onPointerDown={(event) => event.stopPropagation()}
             />
           )}
           {node.asset?.url &&

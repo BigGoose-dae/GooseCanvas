@@ -52,20 +52,25 @@ export default function ModelSettings() {
       protocol: {
         text: "ark-chat-v3",
         image: "ark-image-v3",
+        audio: "doubao-audio-v3",
         video: "ark-video-v3",
       }[type],
-      inputs: type === "text" ? '["text"]' : '["image"]',
+      inputs: type === "text" ? '["text"]' : type === "audio" ? '["audio"]' : '["image"]',
       defaults:
         type === "text"
           ? '{"temperature":0.7,"maxTokens":4096,"thinking":"disabled"}'
           : type === "image"
           ? '{"ratio":"1:1","resolution":"2K"}'
+          : type === "audio"
+          ? '{"responseFormat":"mp3","sampleRate":24000,"speechRate":0,"loudnessRate":0,"pitchRate":0}'
           : '{"ratio":"16:9","resolution":"720p","duration":5}',
       options:
         type === "text"
           ? '{"temperature":[0.2,0.7,1],"maxTokens":[1024,2048,4096,8192],"thinking":["disabled","auto","enabled"]}'
           : type === "image"
           ? '{"ratio":["1:1","16:9","9:16"],"resolution":["1K","2K"]}'
+          : type === "audio"
+          ? '{"responseFormat":["mp3","wav"],"sampleRate":[8000,16000,24000,32000,44100,48000],"speechRate":[-50,0,50,100],"loudnessRate":[-50,0,50,100],"pitchRate":[-12,0,12]}'
           : '{"ratio":["16:9","9:16","1:1"],"resolution":["720p","1080p"],"duration":[5,10]}',
     }));
   const edit = (model) => {
@@ -167,6 +172,7 @@ export default function ModelSettings() {
                   {
                     text: t("textShort"),
                     image: t("imageShort"),
+                    audio: t("audioShort"),
                     video: t("videoShort"),
                   }[model.taskType]
                 }
@@ -230,6 +236,7 @@ export default function ModelSettings() {
               >
                 <option value="text">{t("text")}</option>
                 <option value="image">{t("image")}</option>
+                <option value="audio">{t("audio")}</option>
                 <option value="video">{t("video")}</option>
               </select>
             </label>
@@ -251,6 +258,7 @@ export default function ModelSettings() {
             >
               <option value="ark-chat-v3">{t("arkChatProtocol")}</option>
               <option value="ark-image-v3">{t("arkImageProtocol")}</option>
+              <option value="doubao-audio-v3">{t("doubaoAudioProtocol")}</option>
               <option value="ark-video-v3">{t("arkVideoProtocol")}</option>
             </select>
           </label>

@@ -18,8 +18,8 @@ func TestOpenSeedsBuiltinModelsIdempotently(t *testing.T) {
 		if err := db.Model(&domain.ModelDefinition{}).Where("builtin=? AND deleted_at IS NULL", true).Count(&count).Error; err != nil {
 			t.Fatal(err)
 		}
-		if count != 3 {
-			t.Fatalf("attempt %d: builtin model count = %d, want 3", attempt+1, count)
+		if count != 4 {
+			t.Fatalf("attempt %d: builtin model count = %d, want 4", attempt+1, count)
 		}
 		sqlDB, err := db.DB()
 		if err != nil {

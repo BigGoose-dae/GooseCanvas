@@ -32,6 +32,9 @@ type Manager struct {
 }
 
 func New(db *gorm.DB, cfg config.Config) (*Manager, error) {
+	if strings.TrimSpace(cfg.Volc.AudioEndpoint) == "" {
+		cfg.Volc.AudioEndpoint = config.DefaultAudioEndpoint
+	}
 	var row domain.SystemSetting
 	err := db.First(&row, 1).Error
 	legacy := err == nil && !strings.HasPrefix(row.Value, vaultPrefix)
@@ -49,6 +52,9 @@ func New(db *gorm.DB, cfg config.Config) (*Manager, error) {
 			return nil, err
 		}
 		cfg.Addr, cfg.DataDir, cfg.Database = boot.Addr, boot.DataDir, boot.Database
+		if strings.TrimSpace(cfg.Volc.AudioEndpoint) == "" {
+			cfg.Volc.AudioEndpoint = boot.Volc.AudioEndpoint
+		}
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -109,13 +115,13 @@ func build(cfg config.Config) (Snapshot, error) {
 	if cfg.Worker.PollInterval <= 0 || cfg.Worker.TaskTimeout < time.Minute {
 		return Snapshot{}, fmt.Errorf("轮询间隔必须为正数，任务超时至少 1 分钟")
 	}
-	for _, value := range []string{cfg.Volc.BaseURL} {
+	for _, value := range []string{cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint} {
 		parsed, err := url.Parse(value)
 		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 			return Snapshot{}, fmt.Errorf("服务地址必须是有效的 HTTP 或 HTTPS 地址")
 		}
 	}
-	for _, value := range []string{cfg.Volc.BaseURL} {
+	for _, value := range []string{cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint} {
 		parsed, _ := url.Parse(value)
 		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 			return Snapshot{}, fmt.Errorf("服务地址不能包含凭证、查询参数或片段")

@@ -139,16 +139,16 @@ func modelFromRequest(req modelRequest) (domain.ModelDefinition, error) {
 	if req.Key == "" || req.Name == "" {
 		return domain.ModelDefinition{}, fmt.Errorf("模型名称和 Key 不能为空")
 	}
-	if req.TaskType != "text" && req.TaskType != "image" && req.TaskType != "video" {
-		return domain.ModelDefinition{}, fmt.Errorf("任务类型仅支持 text、image 或 video")
+	if req.TaskType != "text" && req.TaskType != "image" && req.TaskType != "audio" && req.TaskType != "video" {
+		return domain.ModelDefinition{}, fmt.Errorf("任务类型仅支持 text、image、audio 或 video")
 	}
 	if req.Provider == "" {
 		req.Provider = "volcengine"
 	}
 	if req.Protocol == "" {
-		req.Protocol = map[string]string{"text": "ark-chat-v3", "image": "ark-image-v3", "video": "ark-video-v3"}[req.TaskType]
+		req.Protocol = map[string]string{"text": "ark-chat-v3", "image": "ark-image-v3", "audio": "doubao-audio-v3", "video": "ark-video-v3"}[req.TaskType]
 	}
-	expectedProtocol := map[string]string{"text": "ark-chat-v3", "image": "ark-image-v3", "video": "ark-video-v3"}[req.TaskType]
+	expectedProtocol := map[string]string{"text": "ark-chat-v3", "image": "ark-image-v3", "audio": "doubao-audio-v3", "video": "ark-video-v3"}[req.TaskType]
 	if req.Protocol != expectedProtocol {
 		return domain.ModelDefinition{}, fmt.Errorf("%s 模型需要使用 %s 协议", req.TaskType, expectedProtocol)
 	}
@@ -156,7 +156,7 @@ func modelFromRequest(req modelRequest) (domain.ModelDefinition, error) {
 		return domain.ModelDefinition{}, fmt.Errorf("当前基础版仅内置 volcengine 适配器")
 	}
 	if req.Inputs == nil {
-		req.Inputs = map[string][]string{"text": []string{"text"}, "image": []string{"image"}, "video": []string{"image"}}[req.TaskType]
+		req.Inputs = map[string][]string{"text": []string{"text"}, "image": []string{"image"}, "audio": []string{"audio"}, "video": []string{"image"}}[req.TaskType]
 	}
 	if req.Defaults == nil {
 		req.Defaults = map[string]any{}

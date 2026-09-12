@@ -25,6 +25,8 @@ type settingsRequest struct {
 	AppName        string `json:"appName"`
 	BaseURL        string `json:"baseUrl"`
 	APIKey         string `json:"apiKey"`
+	AudioEndpoint  string `json:"audioEndpoint"`
+	AudioAPIKey    string `json:"audioApiKey"`
 	Concurrency    int    `json:"concurrency"`
 	TimeoutMinutes int    `json:"timeoutMinutes"`
 }
@@ -36,6 +38,7 @@ func (a *API) getSettings(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"appName": cfg.AppName, "baseUrl": cfg.Volc.BaseURL,
 		"apiKeyConfigured": cfg.Volc.APIKey != "", "assetDirectory": assetDirectory,
+		"audioEndpoint": cfg.Volc.AudioEndpoint, "audioApiKeyConfigured": cfg.Volc.AudioAPIKey != "",
 		"concurrency": cfg.Worker.Concurrency, "timeoutMinutes": int(cfg.Worker.TaskTimeout.Minutes()),
 	})
 }
@@ -52,7 +55,11 @@ func (a *API) saveSettings(c *gin.Context) {
 	}
 	err := a.Runtime.Update(func(cfg *config.Config) error {
 		req.BaseURL = strings.TrimRight(strings.TrimSpace(req.BaseURL), "/")
-		if cfg.Volc.BaseURL != req.BaseURL {
+		req.AudioEndpoint = strings.TrimSpace(req.AudioEndpoint)
+		if req.AudioEndpoint == "" {
+			req.AudioEndpoint = cfg.Volc.AudioEndpoint
+		}
+		if cfg.Volc.BaseURL != req.BaseURL || cfg.Volc.AudioEndpoint != req.AudioEndpoint {
 			var count int64
 			if err := a.DB.Model(&domain.GenerationSession{}).Where("status IN ?", domain.ActiveStatuses()).Count(&count).Error; err != nil {
 				return err
@@ -61,10 +68,13 @@ func (a *API) saveSettings(c *gin.Context) {
 				return fmt.Errorf("请等待当前任务结束后再更换服务地址")
 			}
 		}
-		cfg.AppName, cfg.Volc.BaseURL = strings.TrimSpace(req.AppName), req.BaseURL
+		cfg.AppName, cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint = strings.TrimSpace(req.AppName), req.BaseURL, req.AudioEndpoint
 		// Empty secret fields explicitly mean keep the existing value.
 		if strings.TrimSpace(req.APIKey) != "" {
 			cfg.Volc.APIKey = strings.TrimSpace(req.APIKey)
+		}
+		if strings.TrimSpace(req.AudioAPIKey) != "" {
+			cfg.Volc.AudioAPIKey = strings.TrimSpace(req.AudioAPIKey)
 		}
 		cfg.Worker.Concurrency = req.Concurrency
 		cfg.Worker.TaskTimeout = time.Duration(req.TimeoutMinutes) * time.Minute
