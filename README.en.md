@@ -2,33 +2,34 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-A standalone, lightweight AI creation canvas that runs locally. The project contains only Go and Web applications and does not rely on a Java scheduler. The Go service includes a concurrent task queue and streams task status to the Web app through SSE.
-
-The current version uses:
-
-- SQLite for projects, nodes, edges, asset metadata, and generation tasks, with no separate database installation.
-- Volcengine Ark with Seedream 5.0 Lite image generation and Seedance 2.0 video generation.
-- Local directories for uploaded assets and final results. The Go service encodes input files as Base64 when calling a model.
-- React, Vite, and XYFlow for project management and an infinite canvas.
-- A Chinese and English Web interface. The first visit follows the browser language, and later selections are stored in the current browser.
+Goose Canvas is an open-source, local-first canvas for AI image and video creation. It lets you organize text, image, and video nodes on an infinite canvas, connect assets and prompts into workflows, and generate content with Volcengine Ark models.
 
 ## Features
 
-- Create and delete projects.
-- Create text, image, and video nodes, move them, and connect upstream and downstream nodes.
-- Upload image and video assets to a local directory.
+- Create and manage multiple creative projects.
+- Add, move, resize, rename, copy, and delete nodes on an infinite canvas.
+- Organize prompts and assets with text, image, and video nodes.
 - Generate images from text or images and videos from text or images.
-- Use text nodes as additional prompts for downstream generation nodes.
-- Run image and video tasks asynchronously, with up to four concurrent requests by default and an adjustable limit in Web settings.
-- Sync task status through SSE with automatic reconnection without overwriting node content being edited.
-- Autosave nodes with visible save status. Failed drafts remain in the browser and can be retried.
-- Copy nodes, browse paginated generation history, preview results, and use explicit download actions.
-- View a project task queue with queued, submitting, generating, archiving, completed, and failed states.
-- Configure the application name, Ark API Key, Ark service URL, concurrency, and task polling timeout in the Web interface, with changes applied immediately.
-- Store uploads and generated results in the Go service without depending on TOS.
-- Customize the application name, logo, and repository link with `APP_NAME`, `APP_LOGO_URL`, and `APP_REPOSITORY_URL`.
-- Use canvas controls consistent with Workshop: right-click empty space to add, right-drag to pan, left-drag to select, Space plus left-drag to pan, resize nodes, and drag from a node's right handle to empty space to create a downstream node.
-- Manage a SQLite-backed model registry in the Web interface and add models compatible with the Volcengine Ark image and video protocols.
+- Upload local images and videos and connect them to generation nodes.
+- Autosave node content, positions, and parameters, with browser draft recovery and retry after a failed save.
+- Run multiple generation tasks concurrently in the backend, with each task isolated from the others.
+- Stream queued, submitting, generating, archiving, completed, and failed states through SSE.
+- Browse the task queue and paginated generation history, preview results, and download files.
+- Configure model connections, task concurrency, and polling timeouts in the Web interface.
+- Manage the model registry and add, edit, enable, disable, or delete custom models.
+- Switch between Chinese and English interfaces and between dark and light themes.
+
+Goose Canvas does not provide task cancellation. After a task has been submitted to a model provider, cancelling it locally cannot guarantee that the provider task will stop.
+
+## Technology
+
+- Go and Gin
+- React, Vite, and XYFlow
+- SQLite
+- Server-Sent Events (SSE)
+- Volcengine Ark API
+
+SQLite stores projects, nodes, edges, asset metadata, model definitions, and generation tasks. Uploaded assets and generated results are stored in local directories.
 
 ## Requirements
 
@@ -36,15 +37,17 @@ The current version uses:
 - Node.js 18+
 - A valid Volcengine Ark API Key
 
-## Run locally
+## Quick start
 
-You do not need to edit a configuration file first. Start the application, open **Settings** on the home page, enter an Ark API Key, and save it. Assets are stored in `DATA_DIR/assets` by default.
+Development mode runs the Go API and Web development server separately.
 
-For development, use two terminals:
+Terminal one:
 
 ```bash
 make dev-api
 ```
+
+Terminal two:
 
 ```bash
 cd web
@@ -54,64 +57,87 @@ npm run dev
 
 Open `http://localhost:5173`. Vite proxies `/api` requests to `http://localhost:8080`.
 
-You can also build the Web application and let the Go service serve both the API and static files:
+On first launch, open **Settings**, enter an Ark API Key, and save it.
+
+## Build and run
 
 ```bash
 make build
 ./bin/goose-canvas
 ```
 
-Open `http://localhost:8080`.
+Open `http://localhost:8080`. The Go service serves both the API and the built Web application.
 
 ## Usage
 
 1. Create a project on the home page.
 2. Open the canvas and add text, image, or video nodes, or upload an asset directly.
-3. Drag from the right handle of an asset or text node to the left handle of a generation node.
-4. Enter a prompt and select parameters such as aspect ratio, resolution, and duration.
-5. Select **Start generation**. The API returns a task immediately and runs image and video generation asynchronously in the backend. SSE updates its status, which is also visible in **Task queue**.
-6. The Go service downloads generated results into the local asset directory immediately, so the canvas does not depend on temporary provider URLs.
+3. Drag from the right handle of an asset or text node to a generation node.
+4. Select the generation node and configure its model, prompt, aspect ratio, resolution, duration, and other parameters.
+5. Select **Start generation**. The task enters the backend queue and its status updates through SSE.
+6. When generation completes, preview or download the result from the node, task queue, or generation history.
 
-Image and video nodes display only their content on the canvas. Select a node to edit its model, prompt, and generation parameters in the inspector. Right-click a node to rename it, copy it, view generation history, edit parameters, or delete it. A copy keeps the node content and current asset, but does not copy edges or submit a task automatically.
+The canvas supports these common controls:
+
+- Right-click empty space to add a node or upload an asset.
+- Right-drag to pan the canvas.
+- Left-drag to select nodes.
+- Hold Space and left-drag to pan.
+- Drag from a node's right handle to empty space to create a downstream node.
+- Right-click a node to rename, copy, view history, edit parameters, or delete it.
+
+Copying a node keeps its content and current asset, but does not copy edges or submit a generation task automatically.
 
 ## Model management
 
-Built-in models are initialized in SQLite by [`internal/database/sql/001_seed_models.sql`](internal/database/sql/001_seed_models.sql). Model keys are no longer configured in `.env`. Open **Models** from the home page or canvas to add, edit, enable, disable, or delete custom models.
-
-Database initialization ensures these built-in models exist:
+Goose Canvas includes these Volcengine Ark model definitions:
 
 | Type | Display name | Model key | Protocol | Defaults |
 | --- | --- | --- | --- | --- |
 | Image | Seedream 5.0 Lite | `doubao-seedream-5-0-lite-260128` | `ark-image-v3` | `1:1`, `2K` |
 | Video | Seedance 2.0 | `doubao-seedance-2-0-260128` | `ark-video-v3` | `16:9`, `720p`, 5 seconds |
 
-A model record contains its model key, task type, provider, protocol, permitted inputs, default parameters, and available options. The current base version includes the `volcengine` provider adapter. You can add any model enabled for your Ark account that supports the `ark-image-v3` or `ark-video-v3` protocol. Other providers require a corresponding Go adapter.
+The model management page configures a model key, task type, provider, protocol, input types, default parameters, and available options. Goose Canvas currently supports the `volcengine` provider with the `ark-image-v3` and `ark-video-v3` protocols.
 
-## Configuration
+Model availability depends on the models enabled for the corresponding Ark account.
 
-Prefer the `/settings` page. It can change the application name, Ark API Key, Ark service URL, maximum concurrent requests (1–32), and task polling timeout (1–1440 minutes). The local asset directory is displayed but cannot be changed on the page. Saved settings apply to subsequent tasks immediately without a restart. Active tasks must finish before the Ark service URL can be changed.
+## Settings
 
-Web settings are saved in SQLite and encrypted with AES-256-GCM. The encryption key is stored separately at `data/.settings.key` with `0600` permissions. Settings APIs report only whether a credential is configured and never return its value. Leaving a password field blank preserves the existing credential.
+Use the `/settings` page to configure:
 
-Plaintext settings from older database versions are encrypted during startup migration. Historical backups are not changed and must be protected separately. Back up both the database and `.settings.key`; credentials cannot be decrypted after restoration without the key. Never upload these files to GitHub, Issues, or public attachments. Encryption protects a database file leaked by itself, but cannot protect a fully compromised machine.
+- Application name
+- Ark API Key
+- Ark service URL
+- Maximum concurrent requests (1–32)
+- Task polling timeout (1–1440 minutes)
 
-When upgrading from the TOS version, old asset metadata remains in the database, but object files are not migrated automatically. Download any TOS files you need before upgrading. Old assets must be uploaded again before they can be used for generation. `TOS_*` environment variables are no longer read and can be removed from the local `.env` after the required assets have been migrated.
+Settings are stored in SQLite, with credentials encrypted using AES-256-GCM. The encryption key is stored at `DATA_DIR/.settings.key`, and the API never returns the original credential value to the page. Leaving the password field blank preserves the saved credential.
 
-The environment variables below remain available for initial setup and development compatibility. After settings have been saved in the Web interface, database values take precedence. `APP_ADDR` and `DATA_DIR` always come from the startup environment.
+Environment variables can also provide initial configuration:
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `APP_NAME` | `Goose Canvas` | Application name |
-| `APP_LOGO_URL` | Empty | Custom logo URL; the built-in logo follows the light or dark theme when empty |
-| `APP_REPOSITORY_URL` | Project GitHub URL | Repository link on the home page |
-| `APP_ADDR` | `127.0.0.1:8080` | Go listen address |
+| `APP_LOGO_URL` | Empty | Custom logo URL; uses the built-in theme logo when empty |
+| `APP_REPOSITORY_URL` | Project GitHub URL | Repository link displayed on the home page |
+| `APP_ADDR` | `127.0.0.1:8080` | Go service listen address |
 | `DATA_DIR` | `./data` | Directory for SQLite, the settings key, and local assets |
 | `VOLCENGINE_API_KEY` | Empty | Volcengine Ark API Key |
 | `VOLCENGINE_BASE_URL` | Ark Beijing endpoint | Ark API base URL |
-| `WORKER_POLL_INTERVAL` | `3s` | Polling interval for asynchronous video tasks |
-| `WORKER_TASK_TIMEOUT` | `30m` | Local polling timeout for asynchronous tasks |
+| `WORKER_POLL_INTERVAL` | `3s` | Status polling interval for asynchronous video tasks |
+| `WORKER_TASK_TIMEOUT` | `30m` | Polling timeout for asynchronous tasks |
 
-Web settings apply without a restart; environment variable changes require one. After Web settings have been saved, database values for the application name, branding, Ark connection, and worker configuration take precedence over corresponding environment variables. Only `APP_ADDR` and `DATA_DIR` always come from the startup environment. Do not place real credentials in `.env.example`. SQL logs do not interpolate parameter values, and local environment and database files are restricted to their owner.
+After Web settings have been saved, database configuration takes precedence. `APP_ADDR` and `DATA_DIR` always come from the startup environment. Restart the service after changing environment variables.
+
+## Files and task processing
+
+The Go service validates uploaded file types and stores them under `DATA_DIR/assets`. Before calling a model, the backend reads input assets and creates `data:*;base64,...` values. Generation task records do not store Base64 file bodies.
+
+When the image API returns Base64 content, the service decodes and saves it locally. When an image or video API returns a temporary file URL, the service downloads and archives it immediately, so generated results do not depend on provider URLs remaining available.
+
+The task queue runs up to four requests concurrently by default. Video tasks do not occupy an execution slot while waiting for their next status poll. After a service restart, tasks that can still be queried or archived resume from SQLite.
+
+A timed-out task can continue querying the original provider task, and a failed archive can retry archiving. Neither action submits a new generation request. Submitting again after an ordinary failure creates a new task and may incur another charge.
 
 ## Architecture
 
@@ -123,28 +149,16 @@ React Canvas ── HTTP (save / submit / history / download) ── Go API ─�
                                                               └─ Local archive ── DATA_DIR/assets
 ```
 
-Uploads first pass through the Go service, which verifies their actual MIME type before writing them to a local directory. Before image-to-image or image-to-video submission, the backend reads the assets and generates `data:*;base64,...` inputs. Task records do not store Base64 input bodies. When the image API returns a Base64 result, the Go service decodes and saves it. When an image or video API returns a temporary URL, the service downloads it immediately and writes it atomically into the local directory.
+## Security and limitations
 
-## Tasks and recovery
+- Goose Canvas is designed for local, single-user use and does not include login, team permissions, or quotas.
+- The default listener is `127.0.0.1:8080`. Configure HTTPS, authentication, and access control before listening on an external interface.
+- Each uploaded file is limited to 50 MB, and input assets for one generation are limited to 50 MB in total.
+- Each generated result is limited to 2 GB.
+- Never commit or publicly share the database, settings key, environment files, or asset directory.
+- The SQLite task queue is intended for a single-machine deployment. Multiple instances require additional database claiming and a distributed queue.
 
-- The queue runs up to four operations concurrently by default, with an independent timeout for each operation. Video tasks do not occupy an execution slot while waiting for the next poll, so a slow request does not block other available slots.
-- An SSE connection sends the latest snapshot on initial connection and reconnection, then streams task changes and heartbeat events. Reverse proxies must disable SSE buffering and permit long-lived connections.
-- Autosave serializes writes per node and saves 600 ms after editing stops by default. Unsaved drafts remain in the current browser. Normal navigation waits for pending saves.
-- A timed-out query can **continue querying the same task**, while a failed result archive can **retry archiving**. Neither action resubmits generation.
-- An uncertain submission is never retried automatically to avoid duplicate billing. **Submit a new generation** creates a new generation record after an ordinary failure.
-- Cancellation is intentionally unavailable. Closing the page or stopping local polling does not cancel a provider task, and deleting a node does not cancel a submitted generation.
-- Running tasks retain the connection configuration they started with, while new tasks use the latest settings. After a service restart, queryable and archivable tasks resume from SQLite.
-
-## Current limitations
-
-- This is a local single-user application without authentication, team permissions, or quotas. Do not expose it directly to the public internet.
-- The default listener is `127.0.0.1:8080`. Setting `APP_ADDR` to `:8080` or another non-loopback address listens on external interfaces and requires your own HTTPS, authentication, and access control.
-- Each uploaded file is limited to 50 MB, and input assets for one generation are limited to 50 MB in total to control Base64 request memory usage.
-- Each generated model result is limited to 2 GB. Temporary URL downloads are written atomically into the local asset directory.
-- Assets stored in TOS by an older release are not migrated automatically and must be uploaded again before reuse.
-- A one-command Docker setup is not currently included.
-- The SQLite task queue is designed for a single-machine deployment. Multiple instances require database-level claiming and a distributed queue.
-- Model IDs and parameters depend on the models enabled for your account. Use the Volcengine Ark console as the source of truth.
+See [SECURITY.md](SECURITY.md) for more security guidance.
 
 ## Development verification
 
@@ -154,6 +168,14 @@ go test -race ./...
 go vet ./...
 ```
 
-Run `make secrets` to scan credentials with Gitleaks installed. GitHub Actions runs tests, builds the application, and scans the complete commit history for secrets. See [SECURITY.md](SECURITY.md) for security guidance.
+With [Gitleaks](https://github.com/gitleaks/gitleaks) installed, scan the repository for exposed credentials:
 
-License: MIT.
+```bash
+make secrets
+```
+
+GitHub Actions runs Go tests, Web tests, the Web production build, and a complete Git history secret scan.
+
+## License
+
+[MIT](LICENSE)
