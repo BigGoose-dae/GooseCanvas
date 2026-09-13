@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
+	"github.com/BigGoose-dae/GooseCanvas/internal/features"
 	"github.com/gin-gonic/gin"
 )
 
@@ -43,6 +44,9 @@ type modelRequest struct {
 
 func (a *API) models(c *gin.Context) {
 	query := a.DB.Where("deleted_at IS NULL")
+	if !features.AudioGeneration {
+		query = query.Where("task_type <> ?", "audio")
+	}
 	if taskType := strings.TrimSpace(c.Query("type")); taskType != "" {
 		query = query.Where("task_type=?", taskType)
 	}
@@ -141,6 +145,9 @@ func modelFromRequest(req modelRequest) (domain.ModelDefinition, error) {
 	}
 	if req.TaskType != "text" && req.TaskType != "image" && req.TaskType != "audio" && req.TaskType != "video" {
 		return domain.ModelDefinition{}, fmt.Errorf("任务类型仅支持 text、image、audio 或 video")
+	}
+	if req.TaskType == "audio" && !features.AudioGeneration {
+		return domain.ModelDefinition{}, fmt.Errorf("当前版本暂不开放音频模型生成")
 	}
 	if req.Provider == "" {
 		req.Provider = "volcengine"

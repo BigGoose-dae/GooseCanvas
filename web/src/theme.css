@@ -208,6 +208,12 @@ body,
   border-color: rgba(20, 24, 32, 0.15);
 }
 
+:root[data-theme='light'] .inspector-notice {
+  border-color: rgba(20, 24, 32, 0.12);
+  background: rgba(20, 24, 32, 0.04);
+  color: #62666d;
+}
+
 :root[data-theme='light'] .node-inspector,
 :root[data-theme='light'] .context-menu,
 :root[data-theme='light'] .canvas-scale {

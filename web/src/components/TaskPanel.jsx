@@ -19,6 +19,10 @@ function GenerationCard({ task, onRetry, onLocate, detailed = false }) {
     value ? new Date(value).toLocaleString(locale, { hour12: false }) : "—";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const canRetry =
+    task.taskType !== "audio" ||
+    task.retryMode === "archive" ||
+    task.retryMode === "query";
   const retry = async () => {
     setBusy(true);
     setError("");
@@ -105,7 +109,7 @@ function GenerationCard({ task, onRetry, onLocate, detailed = false }) {
             ↓ {t("downloadMedia", { type: t(task.taskType) })}
           </a>
         )}
-        {task.status === "failed" && (
+        {task.status === "failed" && canRetry && (
           <button disabled={busy} onClick={retry}>
             {busy
               ? t("processing")
@@ -117,7 +121,7 @@ function GenerationCard({ task, onRetry, onLocate, detailed = false }) {
           </button>
         )}
       </div>
-      {task.status === "failed" && !task.retryMode && (
+      {task.status === "failed" && !task.retryMode && canRetry && (
         <small>
           {t("retryWarning")}
         </small>

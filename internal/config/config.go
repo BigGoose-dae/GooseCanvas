@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BigGoose-dae/GooseCanvas/internal/features"
 	"github.com/joho/godotenv"
 )
 
@@ -77,7 +78,7 @@ func Load() (Config, error) {
 }
 
 func (c Config) Missing() []string {
-	if c.Volc.AudioConfigured() {
+	if features.AudioGeneration && c.Volc.AudioConfigured() {
 		return nil
 	}
 	return c.ModelMissing()

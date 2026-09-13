@@ -18,6 +18,7 @@ import { nodePayload, mergeTaskState } from "../api/autosave";
 import TaskPanel, { isRunning } from "./TaskPanel";
 import LanguageToggle from "./LanguageToggle";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AUDIO_GENERATION_ENABLED } from "../features";
 
 const nodeTypes = { canvasNode: CanvasNode };
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -827,6 +828,10 @@ export default function CanvasPage() {
               </a>
             )}
           </div>
+          {selectedNode.nodeType === "audio" && !AUDIO_GENERATION_ENABLED ? (
+            <p className="inspector-notice">{t("audioUploadOnly")}</p>
+          ) : (
+            <>
           <label>
             {t("model")}
             <select
@@ -1002,6 +1007,8 @@ export default function CanvasPage() {
               {selectedNode.generation.errorMessage}
             </p>
           )}
+            </>
+          )}
         </aside>
       )}
       {panel && (
@@ -1056,7 +1063,12 @@ export default function CanvasPage() {
           ) : (
             <>
               <small>{t("selectNodeType")}</small>
-              {["video", "image", "audio", "text"].map((type) => (
+              {[
+                "video",
+                "image",
+                ...(AUDIO_GENERATION_ENABLED ? ["audio"] : []),
+                "text",
+              ].map((type) => (
                 <button key={type} onClick={() => selectContextType(type)}>
                   {labels[type]}
                 </button>

@@ -170,6 +170,28 @@ func TestTextNodeContentAndPromptAreIndependent(t *testing.T) {
 	}
 }
 
+func TestAudioUploadNodesCannotStartModelGeneration(t *testing.T) {
+	a, r := featureAPI(t)
+	models := jsonCall(t, r, "GET", "/api/v1/models", nil)
+	if models.Code != http.StatusOK || strings.Contains(models.Body.String(), `"taskType":"audio"`) {
+		t.Fatalf("audio models are still exposed: %d %s", models.Code, models.Body.String())
+	}
+	node := domain.Node{WorkspaceID: 1, NodeType: "audio", Title: "uploaded.mp3", Params: "{}"}
+	a.DB.Create(&node)
+
+	response := jsonCall(t, r, "POST", fmt.Sprintf("/api/v1/nodes/%d/run", node.ID), map[string]any{
+		"prompt": "generate speech", "modelKey": "doubao-seed-audio-1.0-reference", "params": map[string]any{},
+	})
+	if response.Code != http.StatusForbidden || !strings.Contains(response.Body.String(), "暂不开放音频模型生成") {
+		t.Fatalf("audio generation was not blocked: %d %s", response.Code, response.Body.String())
+	}
+	var sessions int64
+	a.DB.Model(&domain.GenerationSession{}).Where("node_id=?", node.ID).Count(&sessions)
+	if sessions != 0 {
+		t.Fatalf("blocked audio generation created %d session(s)", sessions)
+	}
+}
+
 func TestRetryResumesOriginalExternalTaskWithFreshTimeout(t *testing.T) {
 	a, r := featureAPI(t)
 	node := domain.Node{WorkspaceID: 1, NodeType: "video", Params: "{}"}

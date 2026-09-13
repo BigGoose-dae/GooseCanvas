@@ -5,6 +5,7 @@ import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
 import LanguageToggle from "./LanguageToggle";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AUDIO_GENERATION_ENABLED } from "../features";
 
 export default function SystemSettings() {
   const navigate = useNavigate();
@@ -120,29 +121,31 @@ export default function SystemSettings() {
                 </label>
               </details>
             </fieldset>
+            {AUDIO_GENERATION_ENABLED && (
+              <fieldset disabled={busy}>
+                <legend>
+                  <b>03</b> {t("audioGeneration")}
+                </legend>
+                <p>{t("audioApiHelp")}</p>
+                {secret("audioApiKey", t("audioApiKey"))}
+                <div className="settings-grid">
+                  {secret("audioAppId", t("audioAppId"))}
+                  {secret("audioAccessKey", t("audioAccessKey"))}
+                </div>
+                <label>
+                  {t("audioEndpoint")}
+                  <input
+                    required
+                    type="url"
+                    value={form.audioEndpoint}
+                    onChange={(event) => change("audioEndpoint", event.target.value)}
+                  />
+                </label>
+              </fieldset>
+            )}
             <fieldset disabled={busy}>
               <legend>
-                <b>03</b> {t("audioGeneration")}
-              </legend>
-              <p>{t("audioApiHelp")}</p>
-              {secret("audioApiKey", t("audioApiKey"))}
-              <div className="settings-grid">
-                {secret("audioAppId", t("audioAppId"))}
-                {secret("audioAccessKey", t("audioAccessKey"))}
-              </div>
-              <label>
-                {t("audioEndpoint")}
-                <input
-                  required
-                  type="url"
-                  value={form.audioEndpoint}
-                  onChange={(event) => change("audioEndpoint", event.target.value)}
-                />
-              </label>
-            </fieldset>
-            <fieldset disabled={busy}>
-              <legend>
-                <b>04</b> {t("assetStorage")}
+                <b>{AUDIO_GENERATION_ENABLED ? "04" : "03"}</b> {t("assetStorage")}
               </legend>
               <p>{t("storageHelp")}</p>
               <label>
@@ -153,7 +156,7 @@ export default function SystemSettings() {
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
-                <b>05</b> {t("taskExecution")}
+                <b>{AUDIO_GENERATION_ENABLED ? "05" : "04"}</b> {t("taskExecution")}
               </legend>
               <div className="settings-grid">
                 <label>

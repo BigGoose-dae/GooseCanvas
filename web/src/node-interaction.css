@@ -77,6 +77,17 @@
   color: rgba(255, 255, 255, 0.42);
 }
 
+.inspector-notice {
+  margin: 14px 0 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #aeb3bf;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .workshop-video-poster {
   position: absolute;
   inset: 0;

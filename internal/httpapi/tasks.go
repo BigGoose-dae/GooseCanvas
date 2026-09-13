@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
+	"github.com/BigGoose-dae/GooseCanvas/internal/features"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -281,6 +282,9 @@ func (a *API) retryGeneration(c *gin.Context) {
 		var task domain.GenerationTask
 		if err := tx.Where("session_id=?", id).First(&task).Error; err != nil {
 			return err
+		}
+		if original.TaskType == "audio" && !features.AudioGeneration && task.RetryMode != "archive" && task.RetryMode != "query" {
+			return fmt.Errorf("当前版本暂不开放音频模型生成，无法重新提交该任务")
 		}
 		if task.RetryMode == "archive" || task.RetryMode == "query" {
 			state := domain.StatusArchiving

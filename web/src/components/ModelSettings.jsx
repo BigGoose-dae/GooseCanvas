@@ -5,6 +5,7 @@ import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
 import LanguageToggle from "./LanguageToggle";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AUDIO_GENERATION_ENABLED } from "../features";
 
 const emptyForm = {
   key: "",
@@ -162,7 +163,7 @@ export default function ModelSettings() {
             </div>
             <button onClick={reset}>＋ {t("addModel")}</button>
           </div>
-          {models.map((model) => (
+          {models.filter((model) => AUDIO_GENERATION_ENABLED || model.taskType !== "audio").map((model) => (
             <article
               className={`model-row ${model.enabled ? "" : "disabled"}`}
               key={model.id}
@@ -236,7 +237,7 @@ export default function ModelSettings() {
               >
                 <option value="text">{t("text")}</option>
                 <option value="image">{t("image")}</option>
-                <option value="audio">{t("audio")}</option>
+                {AUDIO_GENERATION_ENABLED && <option value="audio">{t("audio")}</option>}
                 <option value="video">{t("video")}</option>
               </select>
             </label>
@@ -258,7 +259,7 @@ export default function ModelSettings() {
             >
               <option value="ark-chat-v3">{t("arkChatProtocol")}</option>
               <option value="ark-image-v3">{t("arkImageProtocol")}</option>
-              <option value="doubao-audio-v3">{t("doubaoAudioProtocol")}</option>
+              {AUDIO_GENERATION_ENABLED && <option value="doubao-audio-v3">{t("doubaoAudioProtocol")}</option>}
               <option value="ark-video-v3">{t("arkVideoProtocol")}</option>
             </select>
           </label>

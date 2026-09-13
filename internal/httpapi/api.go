@@ -18,6 +18,7 @@ import (
 	"github.com/BigGoose-dae/GooseCanvas/internal/config"
 	"github.com/BigGoose-dae/GooseCanvas/internal/domain"
 	"github.com/BigGoose-dae/GooseCanvas/internal/events"
+	"github.com/BigGoose-dae/GooseCanvas/internal/features"
 	"github.com/BigGoose-dae/GooseCanvas/internal/provider"
 	"github.com/BigGoose-dae/GooseCanvas/internal/runtime"
 	"github.com/BigGoose-dae/GooseCanvas/internal/storage"
@@ -529,15 +530,15 @@ func (a *API) runNode(c *gin.Context) {
 		a.fail(c, 400, fmt.Errorf("不支持该节点类型"))
 		return
 	}
+	if node.NodeType == "audio" && !features.AudioGeneration {
+		a.fail(c, http.StatusForbidden, fmt.Errorf("当前版本暂不开放音频模型生成；仍可上传、播放和下载音频文件"))
+		return
+	}
 	if node.NodeType != "text" && a.Store == nil {
 		a.fail(c, 503, fmt.Errorf("本地素材目录不可用，无法生成内容"))
 		return
 	}
-	if node.NodeType == "audio" && !a.Config.Volc.AudioConfigured() {
-		a.fail(c, 503, fmt.Errorf("豆包音频 API Key 未配置，无法生成音频"))
-		return
-	}
-	if node.NodeType != "audio" && len(a.Config.ModelMissing()) > 0 {
+	if len(a.Config.ModelMissing()) > 0 {
 		a.fail(c, 503, fmt.Errorf("VOLCENGINE_API_KEY 未配置，无法生成内容"))
 		return
 	}
