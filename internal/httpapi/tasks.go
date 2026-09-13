@@ -237,7 +237,7 @@ func (a *API) duplicateNode(c *gin.Context) {
 		if err := tx.Create(&result).Error; err != nil {
 			return err
 		}
-		return tx.Create(&domain.NodeVersion{NodeID: result.ID, Version: 1, AssetID: result.CurrentAssetID, Prompt: result.Prompt, ModelKey: result.ModelKey, Params: result.Params}).Error
+		return tx.Create(&domain.NodeVersion{NodeID: result.ID, Version: 1, AssetID: result.CurrentAssetID, Prompt: result.Prompt, Content: result.Content, ModelKey: result.ModelKey, Params: result.Params}).Error
 	})
 	if err != nil {
 		a.fail(c, 400, err)

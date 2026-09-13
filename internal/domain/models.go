@@ -18,6 +18,7 @@ type Node struct {
 	NodeType       string     `gorm:"size:20;not null" json:"nodeType"`
 	Title          string     `gorm:"size:120" json:"title"`
 	Prompt         string     `gorm:"type:text" json:"prompt"`
+	Content        string     `gorm:"type:text" json:"content"`
 	ModelKey       string     `gorm:"size:120" json:"modelKey"`
 	Params         string     `gorm:"type:text" json:"params"`
 	PosX           float64    `json:"posX"`
@@ -62,6 +63,7 @@ type NodeVersion struct {
 	Version   int       `gorm:"not null" json:"version"`
 	AssetID   *uint64   `gorm:"index" json:"assetId,omitempty"`
 	Prompt    string    `gorm:"type:text" json:"prompt"`
+	Content   string    `gorm:"type:text" json:"content"`
 	ModelKey  string    `gorm:"size:120" json:"modelKey"`
 	Params    string    `gorm:"type:text" json:"params"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -75,6 +77,7 @@ type GenerationSession struct {
 	ModelKey      string     `gorm:"size:120;not null" json:"modelKey"`
 	Prompt        string     `gorm:"type:text" json:"prompt"`
 	NodePrompt    string     `gorm:"type:text" json:"nodePrompt"`
+	NodeContent   string     `gorm:"type:text" json:"nodeContent"`
 	Params        string     `gorm:"type:text" json:"params"`
 	Status        string     `gorm:"size:20;index;not null" json:"status"`
 	ErrorMessage  string     `gorm:"type:text" json:"errorMessage,omitempty"`

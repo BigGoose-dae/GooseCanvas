@@ -99,10 +99,15 @@ export default function CanvasPage() {
         const restored = graph.nodes.map((node) => {
           const draft = drafts[String(node.id)];
           if (!draft) return node;
+          const normalizedDraft =
+            node.nodeType === "text" &&
+            !Object.prototype.hasOwnProperty.call(draft, "content")
+              ? { ...draft, content: draft.prompt ?? node.content, prompt: node.prompt }
+              : draft;
           const result = {
             ...node,
-            ...draft,
-            params: JSON.stringify(draft.params || {}),
+            ...normalizedDraft,
+            params: JSON.stringify(normalizedDraft.params || {}),
           };
           queue.change(node.id, nodePayload(result));
           return result;
@@ -838,20 +843,14 @@ export default function CanvasPage() {
             </select>
           </label>
           <label>
-            {selectedNode.nodeType === "text"
-              ? t("textInstruction")
-              : t("prompt")}
+            {t("prompt")}
             <textarea
               value={selectedNode.prompt || ""}
               onChange={(event) =>
                 patchLocal(selectedId, { prompt: event.target.value })
               }
               onBlur={() => save(selectedId)}
-              placeholder={
-                selectedNode.nodeType === "text"
-                  ? t("textInstructionPlaceholder")
-                  : t("promptPlaceholder")
-              }
+              placeholder={t("promptPlaceholder")}
             />
           </label>
           {selectedModel?.options?.ratio?.length > 0 && (

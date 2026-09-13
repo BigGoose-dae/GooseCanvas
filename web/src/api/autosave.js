@@ -77,6 +77,7 @@ export function nodePayload(node) {
   return {
     title: node.title,
     prompt: node.prompt,
+    content: node.content,
     modelKey: node.modelKey,
     params,
     posX: node.posX,
@@ -99,9 +100,10 @@ export function mergeTaskState(node, update) {
     update.generation?.status === "succeeded" &&
     update.generation?.taskType === "text" &&
     update.generation?.resultText &&
-    node.prompt === update.generation.nodePrompt
+    node.prompt === update.generation.nodePrompt &&
+    node.content === update.generation.nodeContent
   ) {
-    merged.prompt = update.generation.resultText;
+    merged.content = update.generation.resultText;
   }
   return merged;
 }

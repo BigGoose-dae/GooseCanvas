@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -119,6 +120,53 @@ func TestNodeCopyAndAutosaveDoNotOverwriteGeneratedAsset(t *testing.T) {
 	invalid := jsonCall(t, r, "POST", "/api/v1/workspaces/999/nodes", map[string]any{"nodeType": "text"})
 	if invalid.Code != 404 {
 		t.Fatal("nonexistent workspace accepted")
+	}
+}
+
+func TestTextNodeContentAndPromptAreIndependent(t *testing.T) {
+	a, r := featureAPI(t)
+	if err := a.Runtime.Update(func(cfg *config.Config) error {
+		cfg.Volc.APIKey = "test-key"
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	source := domain.Node{WorkspaceID: 1, NodeType: "text", Content: "source context", Params: "{}"}
+	target := domain.Node{WorkspaceID: 1, NodeType: "text", Prompt: "old instruction", Content: "existing draft", Params: "{}"}
+	a.DB.Create(&source)
+	a.DB.Create(&target)
+	a.DB.Create(&domain.Edge{WorkspaceID: 1, FromNodeID: source.ID, ToNodeID: target.ID})
+
+	response := jsonCall(t, r, "POST", fmt.Sprintf("/api/v1/nodes/%d/run", target.ID), map[string]any{
+		"prompt": "rewrite as a title", "modelKey": "doubao-seed-2-1-pro-260628", "params": map[string]any{}, "inputNodeIds": []uint64{source.ID},
+	})
+	if response.Code != http.StatusCreated {
+		t.Fatalf("run text node: %d %s", response.Code, response.Body.String())
+	}
+	var session domain.GenerationSession
+	if err := json.Unmarshal(response.Body.Bytes(), &session); err != nil {
+		t.Fatal(err)
+	}
+	if session.Prompt != "rewrite as a title\n\nsource context" || session.NodePrompt != "rewrite as a title" || session.NodeContent != "existing draft" {
+		t.Fatalf("generation session mixed prompt and content: %+v", session)
+	}
+	if err := a.DB.First(&target, target.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if target.Prompt != "rewrite as a title" || target.Content != "existing draft" {
+		t.Fatalf("text node fields were not isolated: %+v", target)
+	}
+	legacySave := jsonCall(t, r, "PUT", fmt.Sprintf("/api/v1/nodes/%d", target.ID), map[string]any{
+		"title": "legacy tab", "prompt": "body edited in an old tab", "params": map[string]any{},
+	})
+	if legacySave.Code != http.StatusNoContent {
+		t.Fatalf("legacy save: %d %s", legacySave.Code, legacySave.Body.String())
+	}
+	if err := a.DB.First(&target, target.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if target.Prompt != "rewrite as a title" || target.Content != "body edited in an old tab" {
+		t.Fatalf("legacy text save corrupted separated fields: %+v", target)
 	}
 }
 

@@ -159,17 +159,17 @@ func TestWaitingVideoReleasesConcurrencySlot(t *testing.T) {
 
 func TestTextResultUpdatesNodeAndKeepsGenerationHistory(t *testing.T) {
 	p := &fakeProvider{submit: func(_ context.Context, request provider.Request) (provider.Result, error) {
-		if request.TaskType != "text" || request.Prompt != "draft copy" {
+		if request.TaskType != "text" || request.Prompt != "polish this" {
 			t.Fatalf("request = %#v", request)
 		}
 		return provider.Result{Done: true, Text: "polished copy", Raw: []byte(`{"id":"chat-1"}`)}, nil
 	}}
 	e, db, _ := testEngine(t, p, 1)
-	node := domain.Node{WorkspaceID: 1, NodeType: "text", Title: "Copy", Prompt: "draft copy", Params: "{}"}
+	node := domain.Node{WorkspaceID: 1, NodeType: "text", Title: "Copy", Prompt: "polish this", Content: "draft copy", Params: "{}"}
 	if err := db.Create(&node).Error; err != nil {
 		t.Fatal(err)
 	}
-	session := domain.GenerationSession{WorkspaceID: 1, NodeID: node.ID, TaskType: "text", ModelKey: "doubao-seed-2-1-pro-260628", Prompt: "draft copy", NodePrompt: "draft copy", Params: "{}", Status: domain.StatusPending}
+	session := domain.GenerationSession{WorkspaceID: 1, NodeID: node.ID, TaskType: "text", ModelKey: "doubao-seed-2-1-pro-260628", Prompt: "polish this", NodePrompt: "polish this", NodeContent: "draft copy", Params: "{}", Status: domain.StatusPending}
 	if err := db.Create(&session).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -184,20 +184,20 @@ func TestTextResultUpdatesNodeAndKeepsGenerationHistory(t *testing.T) {
 	if err := db.First(&node, node.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if node.Prompt != "polished copy" || node.Version != 2 || node.CurrentAssetID != nil {
+	if node.Prompt != "polish this" || node.Content != "polished copy" || node.Version != 2 || node.CurrentAssetID != nil {
 		t.Fatalf("node = %+v", node)
 	}
 	if err := db.First(&session, session.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if session.ResultText != "polished copy" || session.Prompt != "draft copy" {
+	if session.ResultText != "polished copy" || session.Prompt != "polish this" {
 		t.Fatalf("session = %+v", session)
 	}
 	var version domain.NodeVersion
 	if err := db.Where("node_id=?", node.ID).First(&version).Error; err != nil {
 		t.Fatal(err)
 	}
-	if version.Prompt != "polished copy" || version.AssetID != nil {
+	if version.Prompt != "polish this" || version.Content != "polished copy" || version.AssetID != nil {
 		t.Fatalf("version = %+v", version)
 	}
 }

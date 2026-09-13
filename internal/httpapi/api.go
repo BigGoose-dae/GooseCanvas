@@ -234,6 +234,7 @@ type nodeRequest struct {
 	NodeType string         `json:"nodeType"`
 	Title    string         `json:"title"`
 	Prompt   string         `json:"prompt"`
+	Content  *string        `json:"content"`
 	ModelKey string         `json:"modelKey"`
 	Params   map[string]any `json:"params"`
 	PosX     float64        `json:"posX"`
@@ -274,7 +275,15 @@ func (a *API) createNode(c *gin.Context) {
 			return
 		}
 	}
-	node := domain.Node{WorkspaceID: wid, NodeType: typeName, Title: strings.TrimSpace(req.Title), Prompt: req.Prompt, ModelKey: req.ModelKey, Params: string(params), PosX: req.PosX, PosY: req.PosY, Width: req.Width, Height: req.Height, CurrentAssetID: req.AssetID, Version: 1}
+	prompt, content := req.Prompt, ""
+	if req.Content != nil {
+		content = *req.Content
+	} else if typeName == "text" {
+		// Preserve compatibility with browser tabs loaded before text content and
+		// generation prompts became separate fields.
+		content, prompt = req.Prompt, ""
+	}
+	node := domain.Node{WorkspaceID: wid, NodeType: typeName, Title: strings.TrimSpace(req.Title), Prompt: prompt, Content: content, ModelKey: req.ModelKey, Params: string(params), PosX: req.PosX, PosY: req.PosY, Width: req.Width, Height: req.Height, CurrentAssetID: req.AssetID, Version: 1}
 	if node.Title == "" {
 		node.Title = map[string]string{"text": "文本", "image": "图片", "audio": "音频", "video": "视频"}[typeName]
 	}
@@ -282,7 +291,7 @@ func (a *API) createNode(c *gin.Context) {
 		if err := tx.Create(&node).Error; err != nil {
 			return err
 		}
-		return tx.Create(&domain.NodeVersion{NodeID: node.ID, Version: 1, AssetID: req.AssetID, Prompt: node.Prompt, ModelKey: node.ModelKey, Params: node.Params}).Error
+		return tx.Create(&domain.NodeVersion{NodeID: node.ID, Version: 1, AssetID: req.AssetID, Prompt: node.Prompt, Content: node.Content, ModelKey: node.ModelKey, Params: node.Params}).Error
 	}); err != nil {
 		a.fail(c, 500, err)
 		return
@@ -309,6 +318,12 @@ func (a *API) updateNode(c *gin.Context) {
 		var node domain.Node
 		if err := tx.Where("id=? AND deleted_at IS NULL", id).First(&node).Error; err != nil {
 			return err
+		}
+		if req.Content != nil {
+			updates["content"] = *req.Content
+		} else if node.NodeType == "text" {
+			updates["content"] = req.Prompt
+			updates["prompt"] = node.Prompt
 		}
 		if err := tx.Model(&node).Updates(updates).Error; err != nil {
 			return err
@@ -565,7 +580,7 @@ func (a *API) runNode(c *gin.Context) {
 				return fmt.Errorf("输入节点 %d 不存在", inputID)
 			}
 			if inputNode.NodeType == "text" {
-				if text := strings.TrimSpace(inputNode.Prompt); text != "" {
+				if text := strings.TrimSpace(inputNode.Content); text != "" {
 					promptParts = append(promptParts, text)
 				}
 				continue
@@ -582,7 +597,7 @@ func (a *API) runNode(c *gin.Context) {
 		if combinedPrompt == "" {
 			return fmt.Errorf("提示词不能为空；也可以连接一个有内容的文本节点")
 		}
-		session = domain.GenerationSession{WorkspaceID: node.WorkspaceID, NodeID: node.ID, TaskType: node.NodeType, ModelKey: model.ModelKey, Prompt: combinedPrompt, NodePrompt: strings.TrimSpace(req.Prompt), Params: string(params), Status: domain.StatusPending}
+		session = domain.GenerationSession{WorkspaceID: node.WorkspaceID, NodeID: node.ID, TaskType: node.NodeType, ModelKey: model.ModelKey, Prompt: combinedPrompt, NodePrompt: strings.TrimSpace(req.Prompt), NodeContent: node.Content, Params: string(params), Status: domain.StatusPending}
 		if err := tx.Create(&session).Error; err != nil {
 			return err
 		}

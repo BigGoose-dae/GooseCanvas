@@ -51,11 +51,11 @@ export default function CanvasNode({ id, data, selected }) {
           <textarea
             autoFocus
             className="workshop-text nodrag nowheel"
-            value={node.prompt || ""}
+            value={node.content || ""}
             placeholder={t("textPlaceholder")}
             onPointerDown={(event) => event.stopPropagation()}
             onChange={(event) =>
-              data.change(id, { prompt: event.target.value })
+              data.change(id, { content: event.target.value })
             }
             onBlur={finishTextEditing}
             onKeyDown={(event) => {
@@ -64,10 +64,10 @@ export default function CanvasNode({ id, data, selected }) {
           />
         ) : (
           <div
-            className={`workshop-text-view ${node.prompt ? "" : "empty"}`}
+            className={`workshop-text-view ${node.content ? "" : "empty"}`}
             onDoubleClick={beginTextEditing}
           >
-            {node.prompt || t("textPlaceholder")}
+            {node.content || t("textPlaceholder")}
           </div>
         )
       ) : (

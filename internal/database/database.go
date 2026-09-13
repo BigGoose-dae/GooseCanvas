@@ -54,12 +54,26 @@ func Open(path string) (*gorm.DB, error) {
 	if err := os.Chmod(path, 0o600); err != nil {
 		return nil, err
 	}
+	hadNodeContent := db.Migrator().HasColumn(&domain.Node{}, "Content")
 	if err := db.AutoMigrate(
 		&domain.Workspace{}, &domain.Node{}, &domain.Edge{}, &domain.Asset{},
 		&domain.NodeVersion{}, &domain.GenerationSession{}, &domain.GenerationInput{}, &domain.GenerationTask{},
 		&domain.ModelDefinition{}, &domain.SystemSetting{},
 	); err != nil {
 		return nil, fmt.Errorf("migrate sqlite: %w", err)
+	}
+	if !hadNodeContent {
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec("UPDATE nodes SET content = prompt, prompt = '' WHERE node_type = 'text'").Error; err != nil {
+				return err
+			}
+			if err := tx.Exec("UPDATE node_versions SET content = prompt, prompt = '' WHERE node_id IN (SELECT id FROM nodes WHERE node_type = 'text')").Error; err != nil {
+				return err
+			}
+			return tx.Exec("UPDATE generation_sessions SET node_content = node_prompt, node_prompt = '' WHERE task_type = 'text'").Error
+		}); err != nil {
+			return nil, fmt.Errorf("migrate text node content: %w", err)
+		}
 	}
 	if err := db.Exec(seedModelsSQL).Error; err != nil {
 		return nil, fmt.Errorf("seed models: %w", err)

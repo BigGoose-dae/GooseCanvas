@@ -72,7 +72,7 @@ Open `http://localhost:8080`. The Go service serves both the API and the built W
 
 1. Create a project on the home page.
 2. Open the canvas and add text, image, audio, or video nodes, or upload an asset directly.
-3. Enter a writing instruction directly in a text node, or connect upstream text nodes to add context. Asset and text nodes can also feed image, audio, and video nodes.
+3. Text-node content and generation prompts are stored separately: edit content in the node and enter the prompt in the inspector. You can also connect upstream text nodes as additional context. Asset and text nodes can feed image, audio, and video nodes.
 4. Select a node and configure its model, prompt or text instruction, aspect ratio, resolution, duration, and other parameters.
 5. Select **Start generation**. The task enters the backend queue and its status updates through SSE.
 6. When generation completes, view text results in the node or generation history, and preview or download image, audio, and video results.

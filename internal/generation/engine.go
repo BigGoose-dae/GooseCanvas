@@ -349,7 +349,7 @@ func (e *Engine) applyResult(ctx context.Context, task *domain.GenerationTask, s
 		if err := tx.First(&node, session.NodeID).Error; err != nil {
 			return err
 		}
-		version := domain.NodeVersion{NodeID: node.ID, Version: node.Version, AssetID: &asset.ID, Prompt: session.Prompt, ModelKey: session.ModelKey, Params: session.Params}
+		version := domain.NodeVersion{NodeID: node.ID, Version: node.Version, AssetID: &asset.ID, Prompt: session.Prompt, Content: node.Content, ModelKey: session.ModelKey, Params: session.Params}
 		if err := tx.Create(&version).Error; err != nil {
 			return err
 		}
@@ -380,14 +380,14 @@ func (e *Engine) completeText(task *domain.GenerationTask, session *domain.Gener
 		}
 		// Keep an edit made while the model was running. The generated text remains
 		// available in history and is written back only when the instruction is unchanged.
-		if node.Prompt == session.NodePrompt {
-			if err := tx.Model(&node).Updates(map[string]any{"prompt": text, "version": gorm.Expr("version + 1")}).Error; err != nil {
+		if node.Prompt == session.NodePrompt && node.Content == session.NodeContent {
+			if err := tx.Model(&node).Updates(map[string]any{"content": text, "version": gorm.Expr("version + 1")}).Error; err != nil {
 				return err
 			}
 			if err := tx.First(&node, session.NodeID).Error; err != nil {
 				return err
 			}
-			version := domain.NodeVersion{NodeID: node.ID, Version: node.Version, Prompt: text, ModelKey: session.ModelKey, Params: session.Params}
+			version := domain.NodeVersion{NodeID: node.ID, Version: node.Version, Prompt: node.Prompt, Content: text, ModelKey: session.ModelKey, Params: session.Params}
 			if err := tx.Create(&version).Error; err != nil {
 				return err
 			}

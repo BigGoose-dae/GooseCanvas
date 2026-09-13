@@ -59,6 +59,7 @@ test("failed writes retain drafts and can be retried without affecting other nod
 test("SSE updates never overwrite draft text, dimensions or layout; saves omit generated asset", () => {
   const node = {
     prompt: "my draft",
+    content: "editable body",
     params: "{}",
     posX: 12,
     posY: 40,
@@ -74,6 +75,7 @@ test("SSE updates never overwrite draft text, dimensions or layout; saves omit g
     generation: { status: "succeeded" },
   });
   assert.equal(merged.prompt, "my draft");
+  assert.equal(merged.content, "editable body");
   assert.equal(merged.posX, 12);
   assert.equal(merged.width, 320);
   assert.equal(merged.currentAssetId, 2);
@@ -81,16 +83,20 @@ test("SSE updates never overwrite draft text, dimensions or layout; saves omit g
   assert.equal("currentAssetId" in nodePayload(merged), false);
 });
 
-test("a completed text task writes its result back only when the submitted instruction is unchanged", () => {
+test("a completed text task updates content without replacing its prompt", () => {
   const update = {
     version: 2,
     generation: {
       taskType: "text",
       status: "succeeded",
       nodePrompt: "write a title",
+      nodeContent: "Old title",
       resultText: "A Better Title",
     },
   };
-  assert.equal(mergeTaskState({ prompt: "write a title" }, update).prompt, "A Better Title");
-  assert.equal(mergeTaskState({ prompt: "new local draft" }, update).prompt, "new local draft");
+  const completed = mergeTaskState({ prompt: "write a title", content: "Old title" }, update);
+  assert.equal(completed.prompt, "write a title");
+  assert.equal(completed.content, "A Better Title");
+  assert.equal(mergeTaskState({ prompt: "new instruction", content: "Old title" }, update).content, "Old title");
+  assert.equal(mergeTaskState({ prompt: "write a title", content: "local edit" }, update).content, "local edit");
 });
