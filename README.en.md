@@ -8,7 +8,7 @@ Goose Canvas is an open-source, local-first canvas for AI text, image, audio, an
 
 - Create and manage multiple creative projects.
 - Add, move, resize, rename, copy, and delete nodes on an infinite canvas.
-- Organize prompts and assets with text, image, audio, and video nodes.
+- Organize prompts and assets with text, image, audio, and video nodes; text-node content renders Markdown automatically.
 - Generate, rewrite, or expand text with Doubao Seed 2.1 Pro, generate images from text or images, generate audio from reference clips, and generate videos from text or images.
 - Upload local images, audio, and videos and connect them to generation nodes. Audio nodes accept up to three reference clips.
 - Autosave node content, positions, and parameters, with browser draft recovery and retry after a failed save.

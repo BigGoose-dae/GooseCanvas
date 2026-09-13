@@ -187,6 +187,27 @@ body,
   color: #8b8e93;
 }
 
+:root[data-theme='light'] .markdown-body blockquote {
+  color: #62666d;
+}
+
+:root[data-theme='light'] .markdown-body code {
+  background: rgba(20, 24, 32, 0.08);
+}
+
+:root[data-theme='light'] .markdown-body pre {
+  background: #f4f5f7;
+}
+
+:root[data-theme='light'] .markdown-body a {
+  color: #4f46c8;
+}
+
+:root[data-theme='light'] .markdown-body th,
+:root[data-theme='light'] .markdown-body td {
+  border-color: rgba(20, 24, 32, 0.15);
+}
+
 :root[data-theme='light'] .node-inspector,
 :root[data-theme='light'] .context-menu,
 :root[data-theme='light'] .canvas-scale {

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../api/client";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -64,10 +66,33 @@ export default function CanvasNode({ id, data, selected }) {
           />
         ) : (
           <div
-            className={`workshop-text-view ${node.content ? "" : "empty"}`}
+            className={`workshop-text-view markdown-body ${node.content ? "" : "empty"}`}
             onDoubleClick={beginTextEditing}
           >
-            {node.content || t("textPlaceholder")}
+            {node.content ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                skipHtml
+                components={{
+                  a: ({ node: _node, ...props }) => (
+                    <a
+                      {...props}
+                      className="nodrag"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onPointerDown={(event) => event.stopPropagation()}
+                    />
+                  ),
+                  img: ({ node: _node, ...props }) => (
+                    <img {...props} loading="lazy" referrerPolicy="no-referrer" />
+                  ),
+                }}
+              >
+                {node.content}
+              </ReactMarkdown>
+            ) : (
+              t("textPlaceholder")
+            )}
           </div>
         )
       ) : (

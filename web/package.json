@@ -12,10 +12,11 @@
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "@xyflow/react": "^12.8.4",
-    "vite": "^5.4.14",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.1.5"
-  },
-  "devDependencies": {}
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.1.5",
+    "remark-gfm": "^4.0.1",
+    "vite": "^5.4.14"
+  }
 }
