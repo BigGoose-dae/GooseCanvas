@@ -55,8 +55,18 @@ export default function CanvasPage() {
     [models, setModels] = useState([]),
     [status, setStatus] = useState(null);
   const [message, setMessage] = useState(""),
+    [messageKind, setMessageKind] = useState("error"),
     [selectedId, setSelectedId] = useState(null),
     [spacePressed, setSpacePressed] = useState(false);
+  const showMessage = useCallback((text, kind = "error") => {
+    setMessage(text);
+    setMessageKind(kind);
+  }, []);
+  useEffect(() => {
+    if (!message || messageKind !== "success") return undefined;
+    const timer = window.setTimeout(() => setMessage(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [message, messageKind]);
   const [viewport, setViewportState] = useState({ x: 0, y: 0, zoom: 1 });
   const [contextMenu, setContextMenu] = useState({
     visible: false,
@@ -129,7 +139,7 @@ export default function CanvasPage() {
         setLoaded(true);
       })
       .catch((error) => {
-        if (live) setMessage(error.message);
+        if (live) showMessage(error.message);
       });
     return () => {
       live = false;
@@ -214,7 +224,7 @@ export default function CanvasPage() {
     [setNodes, queue],
   );
   const save = useCallback(
-    (nodeId) => queue.flush(nodeId).catch((error) => setMessage(error.message)),
+    (nodeId) => queue.flush(nodeId).catch((error) => showMessage(error.message)),
     [queue],
   );
   const changeAndSave = useCallback(
@@ -313,7 +323,7 @@ export default function CanvasPage() {
         await queue.flush(nodeId);
         addLocalNode(await api.duplicateNode(nodeId));
       } catch (error) {
-        setMessage(error.message);
+        showMessage(error.message);
       }
     },
     [queue, addLocalNode],
@@ -343,7 +353,7 @@ export default function CanvasPage() {
         rawRef.current.delete(String(nodeId));
         if (selectedId === String(nodeId)) setSelectedId(null);
       } catch (error) {
-        setMessage(error.message);
+        showMessage(error.message);
       }
     },
     [queue, selectedId, setEdges, setNodes],
@@ -389,7 +399,7 @@ export default function CanvasPage() {
           );
         }
       } catch (error) {
-        setMessage(error.message);
+        showMessage(error.message);
       } finally {
         setSubmitting((current) => {
           const next = new Set(current);
@@ -405,7 +415,7 @@ export default function CanvasPage() {
       await queue.flushAll();
       navigate(destination);
     } catch {
-      setMessage(t("unsavedLeave"));
+      showMessage(t("unsavedLeave"));
     }
   };
   const resize = useCallback(
@@ -519,7 +529,7 @@ export default function CanvasPage() {
         ),
       );
     } catch (error) {
-      setMessage(error.message);
+      showMessage(error.message);
     }
   };
   const deleteEdges = async (removed) => {
@@ -573,7 +583,7 @@ export default function CanvasPage() {
         contextMenu.sourceId,
       );
     } catch (error) {
-      setMessage(error.message);
+      showMessage(error.message);
     }
     setContextMenu((menu) => ({ ...menu, visible: false, mode: "root" }));
     connectRef.current = null;
@@ -583,7 +593,7 @@ export default function CanvasPage() {
     event.target.value = "";
     if (!file) return;
     try {
-      setMessage(t("uploading"));
+      showMessage(t("uploading"));
       const asset = await api.upload(id, file),
         type = file.type.startsWith("image/")
           ? "image"
@@ -594,9 +604,9 @@ export default function CanvasPage() {
           ? { x: contextMenu.flowX, y: contextMenu.flowY }
           : { x: 160, y: 140 };
       await createNode(type, point, null, asset.id, file.name);
-      setMessage("");
+      showMessage("");
     } catch (error) {
-      setMessage(error.message);
+      showMessage(error.message);
     }
   };
   const wheel = (event) => {
@@ -633,7 +643,7 @@ export default function CanvasPage() {
         <button
           className={`autosave-status ${saveStatus}`}
           onClick={() =>
-            queue.flushAll().catch((error) => setMessage(error.message))
+            queue.flushAll().catch((error) => showMessage(error.message))
           }
           title={t("retrySaveTitle")}
           aria-live="polite"
@@ -679,7 +689,7 @@ export default function CanvasPage() {
         <div className={`ready-dot ${status?.ready ? "ok" : ""}`} />
       </header>
       {message && (
-        <div className="canvas-message" onClick={() => setMessage("")}>
+        <div className={`canvas-message ${messageKind}`} onClick={() => showMessage("")}>
           {message}
         </div>
       )}
@@ -1019,7 +1029,7 @@ export default function CanvasPage() {
           const bounds = wrapperRef.current?.getBoundingClientRect();
           const point = flowRef.current?.screenToFlowPosition({ x: (bounds?.left || 0) + (bounds?.width || 800) / 2, y: (bounds?.top || 0) + (bounds?.height || 600) / 2 }) || { x: 100, y: 100 };
           const created = await api.importLibraryAsset(id, { ...item, posX: point.x, posY: point.y });
-          addLocalNode(created); setPanel(null); setMessage(t("assetAddedToCanvas"));
+          addLocalNode(created); setPanel(null); showMessage(t("assetAddedToCanvas"), "success");
         }} />
       ) : panel && (
         <TaskPanel
@@ -1033,7 +1043,7 @@ export default function CanvasPage() {
           onLocate={(nodeId) => {
             const key = String(nodeId);
             if (!rawRef.current.has(key)) {
-              setMessage(t("deletedNodeHistory"));
+              showMessage(t("deletedNodeHistory"));
               return;
             }
             setSelectedId(key);
