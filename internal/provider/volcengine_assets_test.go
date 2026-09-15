@@ -39,3 +39,33 @@ func TestAssetsClientListSignsAndParsesRemoteCount(t *testing.T) {
 		t.Fatalf("unexpected page: %+v", page)
 	}
 }
+
+func TestAssetsClientListsGroupsAndGetsFreshDownloadURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Query().Get("Action") {
+		case "ListAssetGroups":
+			_, _ = w.Write([]byte(`{"Result":{"Items":[{"Id":"group-1","Name":"Characters","Description":"approved people","GroupType":"AIGC","ProjectName":"default"}],"TotalCount":1,"PageNumber":1,"PageSize":100}}`))
+		case "GetAsset":
+			_, _ = w.Write([]byte(`{"Result":{"Id":"asset-1","Name":"Actor","GroupId":"group-1","AssetType":"Image","Status":"Active","URL":"https://cdn.example/temporary.jpg","ProjectName":"default"}}`))
+		default:
+			t.Fatalf("unexpected action %q", r.URL.Query().Get("Action"))
+		}
+	}))
+	defer server.Close()
+	client := NewAssetsClient(config.Volcengine{AssetsAccessKey: "ak", AssetsSecretKey: "sk", AssetsProjectName: "default", AssetsBaseURL: server.URL})
+	groups, err := client.ListGroups(context.Background(), 1, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if groups.TotalCount != 1 || groups.Items[0].Name != "Characters" {
+		t.Fatalf("groups = %+v", groups)
+	}
+	asset, err := client.Get(context.Background(), "asset-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asset.URL != "https://cdn.example/temporary.jpg" || asset.GroupID != "group-1" {
+		t.Fatalf("asset = %+v", asset)
+	}
+}

@@ -16,7 +16,7 @@ Goose Canvas is an open-source, local-first multimedia creation canvas. It lets 
 - Stream queued, submitting, generating, archiving, completed, and failed states through SSE.
 - Browse the task queue and paginated generation history, preview results, and download files.
 - Configure model connections, task concurrency, and polling timeouts in the Web interface.
-- Test the Ark connection and sync the Seedance trusted asset library for the current credentials and project. Active assets can be added to the canvas and used in video generation through `asset://` references.
+- Test the Ark connection and sync Seedance trusted asset groups and assets for the current credentials and project. Adding an active asset downloads a local preview and archive while retaining its `asset://` reference for video generation.
 - Manage the model registry and add, edit, enable, disable, or delete custom models.
 - Switch between Chinese and English interfaces and between dark and light themes.
 

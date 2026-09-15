@@ -267,6 +267,20 @@ func (e *Engine) buildRequest(ctx context.Context, session domain.GenerationSess
 			inputs = append(inputs, provider.Input{Type: row.InputType, Role: row.InputRole, MIME: asset.ContentType, URI: "asset://" + asset.ObjectKey})
 			continue
 		}
+		if asset.StorageProvider == "local" && session.TaskType == "video" && strings.TrimSpace(asset.Meta) != "" {
+			var metadata struct {
+				CredentialScope string `json:"credentialScope"`
+				ProviderAssetID string `json:"providerAssetId"`
+			}
+			_ = json.Unmarshal([]byte(asset.Meta), &metadata)
+			if strings.TrimSpace(metadata.ProviderAssetID) != "" {
+				if metadata.CredentialScope != e.cfg.Volc.AssetCredentialScope() {
+					return provider.Request{}, fmt.Errorf("可信素材 %d 属于其他 API Key 或项目，请从当前素材库重新添加", asset.ID)
+				}
+				inputs = append(inputs, provider.Input{Type: row.InputType, Role: row.InputRole, MIME: asset.ContentType, URI: "asset://" + strings.TrimSpace(metadata.ProviderAssetID)})
+				continue
+			}
+		}
 		if asset.StorageProvider != "local" {
 			return provider.Request{}, fmt.Errorf("素材 %d 使用旧版 TOS 存储，请重新上传后再生成", asset.ID)
 		}

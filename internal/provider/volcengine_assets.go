@@ -28,6 +28,25 @@ type AssetLibraryItem struct {
 	UpdateTime        string `json:"updateTime,omitempty"`
 	LastInferenceTime string `json:"lastInferenceTime,omitempty"`
 	Error             any    `json:"error,omitempty"`
+	URL               string `json:"-"`
+}
+
+type AssetGroupItem struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	GroupType   string `json:"groupType"`
+	ProjectName string `json:"projectName"`
+	CreateTime  string `json:"createTime,omitempty"`
+	UpdateTime  string `json:"updateTime,omitempty"`
+}
+
+type AssetGroupPage struct {
+	Items      []AssetGroupItem `json:"items"`
+	TotalCount int              `json:"totalCount"`
+	PageNumber int              `json:"pageNumber"`
+	PageSize   int              `json:"pageSize"`
 }
 
 type AssetLibraryPage struct {
@@ -51,18 +70,22 @@ func (c *AssetsClient) Configured() bool {
 	return strings.TrimSpace(c.cfg.AssetsAccessKey) != "" && strings.TrimSpace(c.cfg.AssetsSecretKey) != ""
 }
 
-func (c *AssetsClient) List(ctx context.Context, page, pageSize int) (AssetLibraryPage, error) {
+func (c *AssetsClient) List(ctx context.Context, page, pageSize int, groupID ...string) (AssetLibraryPage, error) {
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 100
 	}
+	filter := map[string]any{"GroupType": "AIGC"}
+	if len(groupID) > 0 && strings.TrimSpace(groupID[0]) != "" {
+		filter["GroupIds"] = []string{strings.TrimSpace(groupID[0])}
+	}
 	payload := map[string]any{
 		"PageNumber": page, "PageSize": pageSize,
 		"SortBy": "CreateTime", "SortOrder": "Desc",
 		"ProjectName": strings.TrimSpace(c.cfg.AssetsProjectName),
-		"Filter":      map[string]any{"GroupType": "AIGC"},
+		"Filter":      filter,
 	}
 	var raw struct {
 		Items []struct {
@@ -76,6 +99,7 @@ func (c *AssetsClient) List(ctx context.Context, page, pageSize int) (AssetLibra
 			UpdateTime        string `json:"UpdateTime"`
 			LastInferenceTime string `json:"LastInferenceTime"`
 			Error             any    `json:"Error"`
+			URL               string `json:"URL"`
 		} `json:"Items"`
 		TotalCount int `json:"TotalCount"`
 		PageNumber int `json:"PageNumber"`
@@ -86,9 +110,62 @@ func (c *AssetsClient) List(ctx context.Context, page, pageSize int) (AssetLibra
 	}
 	result := AssetLibraryPage{TotalCount: raw.TotalCount, PageNumber: raw.PageNumber, PageSize: raw.PageSize, Items: make([]AssetLibraryItem, 0, len(raw.Items))}
 	for _, item := range raw.Items {
-		result.Items = append(result.Items, AssetLibraryItem{ID: item.ID, Name: item.Name, GroupID: item.GroupID, AssetType: item.AssetType, Status: item.Status, ProjectName: item.ProjectName, CreateTime: item.CreateTime, UpdateTime: item.UpdateTime, LastInferenceTime: item.LastInferenceTime, Error: item.Error})
+		result.Items = append(result.Items, AssetLibraryItem{ID: item.ID, Name: item.Name, GroupID: item.GroupID, AssetType: item.AssetType, Status: item.Status, ProjectName: item.ProjectName, CreateTime: item.CreateTime, UpdateTime: item.UpdateTime, LastInferenceTime: item.LastInferenceTime, Error: item.Error, URL: item.URL})
 	}
 	return result, nil
+}
+
+func (c *AssetsClient) ListGroups(ctx context.Context, page, pageSize int) (AssetGroupPage, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 100
+	}
+	payload := map[string]any{"PageNumber": page, "PageSize": pageSize, "SortBy": "CreateTime", "SortOrder": "Desc", "ProjectName": strings.TrimSpace(c.cfg.AssetsProjectName), "Filter": map[string]any{"GroupType": "AIGC"}}
+	var raw struct {
+		Items []struct {
+			ID          string `json:"Id"`
+			Name        string `json:"Name"`
+			Title       string `json:"Title"`
+			Description string `json:"Description"`
+			GroupType   string `json:"GroupType"`
+			ProjectName string `json:"ProjectName"`
+			CreateTime  string `json:"CreateTime"`
+			UpdateTime  string `json:"UpdateTime"`
+		} `json:"Items"`
+		TotalCount int `json:"TotalCount"`
+		PageNumber int `json:"PageNumber"`
+		PageSize   int `json:"PageSize"`
+	}
+	if err := c.do(ctx, "ListAssetGroups", payload, &raw); err != nil {
+		return AssetGroupPage{}, err
+	}
+	result := AssetGroupPage{TotalCount: raw.TotalCount, PageNumber: raw.PageNumber, PageSize: raw.PageSize, Items: make([]AssetGroupItem, 0, len(raw.Items))}
+	for _, item := range raw.Items {
+		result.Items = append(result.Items, AssetGroupItem{ID: item.ID, Name: item.Name, Title: item.Title, Description: item.Description, GroupType: item.GroupType, ProjectName: item.ProjectName, CreateTime: item.CreateTime, UpdateTime: item.UpdateTime})
+	}
+	return result, nil
+}
+
+func (c *AssetsClient) Get(ctx context.Context, assetID string) (AssetLibraryItem, error) {
+	var raw struct {
+		ID                string `json:"Id"`
+		Name              string `json:"Name"`
+		GroupID           string `json:"GroupId"`
+		AssetType         string `json:"AssetType"`
+		Status            string `json:"Status"`
+		ProjectName       string `json:"ProjectName"`
+		CreateTime        string `json:"CreateTime"`
+		UpdateTime        string `json:"UpdateTime"`
+		LastInferenceTime string `json:"LastInferenceTime"`
+		Error             any    `json:"Error"`
+		URL               string `json:"URL"`
+	}
+	if err := c.do(ctx, "GetAsset", map[string]any{"Id": strings.TrimSpace(assetID), "ProjectName": strings.TrimSpace(c.cfg.AssetsProjectName)}, &raw); err != nil {
+		return AssetLibraryItem{}, err
+	}
+	return AssetLibraryItem{ID: raw.ID, Name: raw.Name, GroupID: raw.GroupID, AssetType: raw.AssetType, Status: raw.Status, ProjectName: raw.ProjectName, CreateTime: raw.CreateTime, UpdateTime: raw.UpdateTime, LastInferenceTime: raw.LastInferenceTime, Error: raw.Error, URL: raw.URL}, nil
 }
 
 func (c *AssetsClient) do(ctx context.Context, action string, payload, target any) error {

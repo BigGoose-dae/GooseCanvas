@@ -26,7 +26,7 @@ export const api = {
     request("/settings", { method: "PUT", body: JSON.stringify(body) }),
   testConnection: (body) =>
     request("/settings/test-connection", { method: "POST", body: JSON.stringify(body) }),
-  assetLibrary: (page = 1) => request(`/asset-library?page=${page}&pageSize=100`),
+  assetLibrary: (page = 1, groupId = "") => request(`/asset-library?page=${page}&pageSize=100${groupId ? `&groupId=${encodeURIComponent(groupId)}` : ""}`),
   importLibraryAsset: (workspaceId, body) => request(`/workspaces/${workspaceId}/asset-library/nodes`, { method: "POST", body: JSON.stringify(body) }),
   history: (id, before) =>
     request(`/nodes/${id}/history${before ? `?before=${before}` : ""}`),

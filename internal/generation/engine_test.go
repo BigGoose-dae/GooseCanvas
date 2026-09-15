@@ -298,6 +298,25 @@ func TestBuildRequestUsesTrustedAssetURIWithinCredentialScope(t *testing.T) {
 	}
 }
 
+func TestBuildRequestUsesDownloadedTrustedAssetURIForVideo(t *testing.T) {
+	p := &fakeProvider{submit: func(context.Context, provider.Request) (provider.Result, error) { return provider.Result{}, nil }}
+	e, db, _ := testEngine(t, p, 1)
+	e.cfg.Volc = config.Volcengine{APIKey: "key-a", AssetsAccessKey: "ak-a", AssetsProjectName: "default"}
+	meta, _ := json.Marshal(map[string]string{"credentialScope": e.cfg.Volc.AssetCredentialScope(), "providerAssetId": "asset-downloaded-1"})
+	asset := domain.Asset{WorkspaceID: 1, AssetType: "image", StorageProvider: "local", ObjectKey: "trusted/local.jpg", ContentType: "image/jpeg", Meta: string(meta)}
+	db.Create(&asset)
+	session := domain.GenerationSession{WorkspaceID: 1, NodeID: 1, TaskType: "video", ModelKey: "model", Params: "{}"}
+	db.Create(&session)
+	db.Create(&domain.GenerationInput{SessionID: session.ID, AssetID: asset.ID, InputType: "image", InputRole: "reference"})
+	request, err := e.buildRequest(context.Background(), session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(request.Inputs) != 1 || request.Inputs[0].URI != "asset://asset-downloaded-1" {
+		t.Fatalf("trusted input = %#v", request.Inputs)
+	}
+}
+
 func TestPersistResultDownloadsTemporaryURLToLocalStore(t *testing.T) {
 	want := []byte("generated video")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
