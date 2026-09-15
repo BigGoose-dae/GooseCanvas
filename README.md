@@ -16,6 +16,7 @@ Goose Canvas 是一个开源、本地优先的多媒体创作画布。你可以�
 - 通过 SSE 实时同步排队、提交、生成、归档、完成和失败状态。
 - 查看任务队列、分页生成历史、结果预览及下载入口。
 - 在 Web 页面配置模型连接、任务并发数和查询超时。
+- 测试方舟连接并同步当前凭证与项目对应的 Seedance 可信素材库；可用素材可直接加入画布并以 `asset://` 引用参与视频生成。
 - 管理模型注册表，添加、编辑、启停或删除自定义模型。
 - 支持中文和英文界面、深色和浅色主题。
 
@@ -58,6 +59,8 @@ npm run dev
 打开 `http://localhost:5173`。Vite 会将 `/api` 请求代理到 `http://localhost:8080`。
 
 首次打开后进入「设置」，填写方舟 API Key 并保存。
+
+使用 Seedance 可信素材库时，还需填写火山引擎 IAM Access Key、Secret Key 和方舟项目名。推理 API Key 与 IAM AK/SK 用途不同；设置页会分别测试两项连接，素材数量直接从火山方舟同步。
 
 ## 构建运行
 
@@ -109,6 +112,7 @@ Goose Canvas 内置以下火山引擎模型定义：
 - 应用名称
 - 方舟 API Key
 - 方舟服务地址
+- Seedance 可信素材库 IAM Access Key、Secret Key、项目名和管理面地址
 - 最大并发请求数（1–32）
 - 任务查询超时（1–1440 分钟）
 
@@ -125,6 +129,10 @@ Goose Canvas 内置以下火山引擎模型定义：
 | `DATA_DIR` | `./data` | SQLite、配置密钥和本地素材目录 |
 | `VOLCENGINE_API_KEY` | 空 | 火山引擎方舟 API Key |
 | `VOLCENGINE_BASE_URL` | 方舟北京地址 | 方舟 API 根地址 |
+| `VOLCENGINE_ASSETS_ACCESS_KEY` | 空 | 可信素材库 IAM Access Key |
+| `VOLCENGINE_ASSETS_SECRET_KEY` | 空 | 可信素材库 IAM Secret Key |
+| `VOLCENGINE_ASSETS_PROJECT_NAME` | `default` | 可信素材库所属方舟项目 |
+| `VOLCENGINE_ASSETS_BASE_URL` | 方舟北京管理面地址 | 可信素材库 API 根地址 |
 | `WORKER_POLL_INTERVAL` | `3s` | 异步视频任务状态查询间隔 |
 | `WORKER_TASK_TIMEOUT` | `30m` | 异步任务查询超时 |
 

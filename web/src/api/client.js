@@ -24,6 +24,10 @@ export const api = {
   settings: () => request("/settings"),
   saveSettings: (body) =>
     request("/settings", { method: "PUT", body: JSON.stringify(body) }),
+  testConnection: (body) =>
+    request("/settings/test-connection", { method: "POST", body: JSON.stringify(body) }),
+  assetLibrary: (page = 1) => request(`/asset-library?page=${page}&pageSize=100`),
+  importLibraryAsset: (workspaceId, body) => request(`/workspaces/${workspaceId}/asset-library/nodes`, { method: "POST", body: JSON.stringify(body) }),
   history: (id, before) =>
     request(`/nodes/${id}/history${before ? `?before=${before}` : ""}`),
   duplicateNode: (id) => request(`/nodes/${id}/duplicate`, { method: "POST" }),

@@ -35,6 +35,12 @@ func New(db *gorm.DB, cfg config.Config) (*Manager, error) {
 	if strings.TrimSpace(cfg.Volc.AudioEndpoint) == "" {
 		cfg.Volc.AudioEndpoint = config.DefaultAudioEndpoint
 	}
+	if strings.TrimSpace(cfg.Volc.AssetsBaseURL) == "" {
+		cfg.Volc.AssetsBaseURL = config.DefaultAssetsBaseURL
+	}
+	if strings.TrimSpace(cfg.Volc.AssetsProjectName) == "" {
+		cfg.Volc.AssetsProjectName = "default"
+	}
 	var row domain.SystemSetting
 	err := db.First(&row, 1).Error
 	legacy := err == nil && !strings.HasPrefix(row.Value, vaultPrefix)
@@ -54,6 +60,12 @@ func New(db *gorm.DB, cfg config.Config) (*Manager, error) {
 		cfg.Addr, cfg.DataDir, cfg.Database = boot.Addr, boot.DataDir, boot.Database
 		if strings.TrimSpace(cfg.Volc.AudioEndpoint) == "" {
 			cfg.Volc.AudioEndpoint = boot.Volc.AudioEndpoint
+		}
+		if strings.TrimSpace(cfg.Volc.AssetsBaseURL) == "" {
+			cfg.Volc.AssetsBaseURL = boot.Volc.AssetsBaseURL
+		}
+		if strings.TrimSpace(cfg.Volc.AssetsProjectName) == "" {
+			cfg.Volc.AssetsProjectName = boot.Volc.AssetsProjectName
 		}
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
@@ -118,13 +130,16 @@ func build(cfg config.Config) (Snapshot, error) {
 	if (strings.TrimSpace(cfg.Volc.AudioAppID) == "") != (strings.TrimSpace(cfg.Volc.AudioAccessKey) == "") {
 		return Snapshot{}, fmt.Errorf("豆包语音 App ID 与 Access Key 必须同时配置")
 	}
-	for _, value := range []string{cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint} {
+	if (strings.TrimSpace(cfg.Volc.AssetsAccessKey) == "") != (strings.TrimSpace(cfg.Volc.AssetsSecretKey) == "") {
+		return Snapshot{}, fmt.Errorf("火山素材库 Access Key 与 Secret Key 必须同时配置")
+	}
+	for _, value := range []string{cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint, cfg.Volc.AssetsBaseURL} {
 		parsed, err := url.Parse(value)
 		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 			return Snapshot{}, fmt.Errorf("服务地址必须是有效的 HTTP 或 HTTPS 地址")
 		}
 	}
-	for _, value := range []string{cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint} {
+	for _, value := range []string{cfg.Volc.BaseURL, cfg.Volc.AudioEndpoint, cfg.Volc.AssetsBaseURL} {
 		parsed, _ := url.Parse(value)
 		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 			return Snapshot{}, fmt.Errorf("服务地址不能包含凭证、查询参数或片段")

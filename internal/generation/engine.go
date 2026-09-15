@@ -256,6 +256,17 @@ func (e *Engine) buildRequest(ctx context.Context, session domain.GenerationSess
 		if err := e.db.First(&asset, row.AssetID).Error; err != nil {
 			return provider.Request{}, err
 		}
+		if asset.StorageProvider == "volcengine" {
+			var metadata struct {
+				CredentialScope string `json:"credentialScope"`
+			}
+			_ = json.Unmarshal([]byte(asset.Meta), &metadata)
+			if metadata.CredentialScope == "" || metadata.CredentialScope != e.cfg.Volc.AssetCredentialScope() {
+				return provider.Request{}, fmt.Errorf("可信素材 %d 属于其他 API Key 或项目，请从当前素材库重新添加", asset.ID)
+			}
+			inputs = append(inputs, provider.Input{Type: row.InputType, Role: row.InputRole, MIME: asset.ContentType, URI: "asset://" + asset.ObjectKey})
+			continue
+		}
 		if asset.StorageProvider != "local" {
 			return provider.Request{}, fmt.Errorf("素材 %d 使用旧版 TOS 存储，请重新上传后再生成", asset.ID)
 		}

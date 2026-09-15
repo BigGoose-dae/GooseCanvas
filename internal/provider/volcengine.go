@@ -365,7 +365,11 @@ func (v *Volcengine) submitVideo(ctx context.Context, req Request) (Result, erro
 		content = append(content, map[string]any{"type": "text", "text": strings.TrimSpace(req.Prompt)})
 	}
 	for _, input := range req.Inputs {
-		if input.DataURI == "" || (input.Type != "image" && input.Type != "video") {
+		inputURL := input.URI
+		if inputURL == "" {
+			inputURL = input.DataURI
+		}
+		if inputURL == "" || (input.Type != "image" && input.Type != "video") {
 			continue
 		}
 		kind := input.Type + "_url"
@@ -373,7 +377,7 @@ func (v *Volcengine) submitVideo(ctx context.Context, req Request) (Result, erro
 		if role == "" {
 			role = "reference"
 		}
-		content = append(content, map[string]any{"type": kind, "role": role, kind: map[string]any{"url": input.DataURI}})
+		content = append(content, map[string]any{"type": kind, "role": role, kind: map[string]any{"url": inputURL}})
 	}
 	body := map[string]any{
 		"model": req.Model, "content": content,

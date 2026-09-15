@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +12,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
+func (v Volcengine) AssetCredentialScope() string {
+	digest := sha256.Sum256([]byte(strings.TrimSpace(v.APIKey) + "\x00" + strings.TrimSpace(v.AssetsAccessKey) + "\x00" + strings.TrimSpace(v.AssetsProjectName)))
+	return fmt.Sprintf("volc-%x", digest[:8])
+}
+
 const DefaultAudioEndpoint = "https://openspeech.bytedance.com/api/v3/tts/create"
+const DefaultAssetsBaseURL = "https://ark.cn-beijing.volcengineapi.com"
 
 type Config struct {
 	AppName  string
@@ -25,12 +32,16 @@ type Config struct {
 }
 
 type Volcengine struct {
-	APIKey         string
-	BaseURL        string
-	AudioAPIKey    string
-	AudioAppID     string
-	AudioAccessKey string
-	AudioEndpoint  string
+	APIKey            string
+	BaseURL           string
+	AudioAPIKey       string
+	AudioAppID        string
+	AudioAccessKey    string
+	AudioEndpoint     string
+	AssetsAccessKey   string
+	AssetsSecretKey   string
+	AssetsProjectName string
+	AssetsBaseURL     string
 }
 
 type Worker struct {
@@ -62,12 +73,16 @@ func Load() (Config, error) {
 		DataDir:  dataDir,
 		Database: filepath.Join(dataDir, "goose-canvas.db"),
 		Volc: Volcengine{
-			APIKey:         strings.TrimSpace(os.Getenv("VOLCENGINE_API_KEY")),
-			BaseURL:        strings.TrimRight(env("VOLCENGINE_BASE_URL", "https://ark.cn-beijing.volces.com"), "/"),
-			AudioAPIKey:    strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_API_KEY")),
-			AudioAppID:     strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_APP_ID")),
-			AudioAccessKey: strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_ACCESS_KEY")),
-			AudioEndpoint:  env("VOLCENGINE_AUDIO_ENDPOINT", DefaultAudioEndpoint),
+			APIKey:            strings.TrimSpace(os.Getenv("VOLCENGINE_API_KEY")),
+			BaseURL:           strings.TrimRight(env("VOLCENGINE_BASE_URL", "https://ark.cn-beijing.volces.com"), "/"),
+			AudioAPIKey:       strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_API_KEY")),
+			AudioAppID:        strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_APP_ID")),
+			AudioAccessKey:    strings.TrimSpace(os.Getenv("VOLCENGINE_AUDIO_ACCESS_KEY")),
+			AudioEndpoint:     env("VOLCENGINE_AUDIO_ENDPOINT", DefaultAudioEndpoint),
+			AssetsAccessKey:   strings.TrimSpace(os.Getenv("VOLCENGINE_ASSETS_ACCESS_KEY")),
+			AssetsSecretKey:   strings.TrimSpace(os.Getenv("VOLCENGINE_ASSETS_SECRET_KEY")),
+			AssetsProjectName: env("VOLCENGINE_ASSETS_PROJECT_NAME", "default"),
+			AssetsBaseURL:     strings.TrimRight(env("VOLCENGINE_ASSETS_BASE_URL", DefaultAssetsBaseURL), "/"),
 		},
 		Worker: Worker{PollInterval: pollInterval, TaskTimeout: taskTimeout, Concurrency: 4},
 	}
@@ -117,7 +132,7 @@ func duration(key string, fallback time.Duration) (time.Duration, error) {
 
 // Redact keeps configured credentials out of user-facing errors and logs.
 func (c Config) Redact(message string) string {
-	for _, secret := range []string{c.Volc.APIKey, c.Volc.AudioAPIKey, c.Volc.AudioAppID, c.Volc.AudioAccessKey} {
+	for _, secret := range []string{c.Volc.APIKey, c.Volc.AudioAPIKey, c.Volc.AudioAppID, c.Volc.AudioAccessKey, c.Volc.AssetsAccessKey, c.Volc.AssetsSecretKey} {
 		secret = strings.TrimSpace(secret)
 		variants := []string{secret}
 		if len(secret) >= 7 && strings.EqualFold(secret[:7], "Bearer ") {

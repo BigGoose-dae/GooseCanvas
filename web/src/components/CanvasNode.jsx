@@ -184,11 +184,12 @@ export default function CanvasNode({ id, data, selected }) {
           </span>
           <button onClick={() => data.copy(id)}>{t("copy")}</button>
           <button onClick={() => data.history(id)}>{t("history")}</button>
-          {node.currentAssetId && (
+          {node.currentAssetId && node.asset?.storageProvider === "local" && (
             <a href={api.downloadURL(node.currentAssetId)} download>
               ↓ {t("download")}
             </a>
           )}
+          {node.asset?.storageProvider === "volcengine" && <span>{t("trustedAsset")}</span>}
           {data.saveState === "error" && (
             <button onClick={() => data.save(id)}>{t("retrySave")}</button>
           )}

@@ -14,17 +14,20 @@ export default function SystemSettings() {
   const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   useEffect(() => {
     api
       .settings()
       .then((data) =>
-        setForm({ ...data, apiKey: "", audioApiKey: "", audioAppId: "", audioAccessKey: "" }),
+        setForm({ ...data, apiKey: "", audioApiKey: "", audioAppId: "", audioAccessKey: "", assetsAccessKey: "", assetsSecretKey: "" }),
       )
       .catch((err) => setError(err.message));
   }, []);
   const change = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
     setSaved("");
+    setTestResult(null);
   };
   const save = async (event) => {
     event.preventDefault();
@@ -33,13 +36,19 @@ export default function SystemSettings() {
     setSaved("");
     try {
       const data = await api.saveSettings(form);
-      setForm({ ...data, apiKey: "", audioApiKey: "", audioAppId: "", audioAccessKey: "" });
+      setForm({ ...data, apiKey: "", audioApiKey: "", audioAppId: "", audioAccessKey: "", assetsAccessKey: "", assetsSecretKey: "" });
       setSaved(t("settingsSaved"));
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(false);
     }
+  };
+  const test = async () => {
+    setTesting(true); setError(""); setTestResult(null);
+    try { setTestResult(await api.testConnection(form)); }
+    catch (err) { setError(err.message); }
+    finally { setTesting(false); }
   };
   const secret = (key, label) => (
     <label>
@@ -120,6 +129,27 @@ export default function SystemSettings() {
                   />
                 </label>
               </details>
+              <div className="settings-inline-actions">
+                <button type="button" onClick={test} disabled={testing}>
+                  {testing ? t("testingConnection") : t("testConnection")}
+                </button>
+              </div>
+              {testResult && (
+                <div className="connection-test-result" role="status">
+                  <p className={testResult.inference.ok ? "ok" : "failed"}>{testResult.inference.message}</p>
+                  {testResult.assetLibrary.configured && <p className={testResult.assetLibrary.ok ? "ok" : "failed"}>{testResult.assetLibrary.message}{testResult.assetLibrary.ok ? ` · ${t("remoteAssetCount", { count: testResult.assetLibrary.remoteCount })}` : ""}</p>}
+                </div>
+              )}
+            </fieldset>
+            <fieldset disabled={busy}>
+              <legend><b>{AUDIO_GENERATION_ENABLED ? "04" : "03"}</b> {t("trustedAssetLibrary")}</legend>
+              <p>{t("assetLibraryCredentialHelp")}</p>
+              <div className="settings-grid">
+                {secret("assetsAccessKey", t("iamAccessKey"))}
+                {secret("assetsSecretKey", t("iamSecretKey"))}
+              </div>
+              <label>{t("arkProjectName")}<input required value={form.assetsProjectName} onChange={(event) => change("assetsProjectName", event.target.value)} /></label>
+              <details><summary>{t("advancedConnection")}</summary><label>{t("assetApiBaseUrl")}<input required type="url" value={form.assetsBaseUrl} onChange={(event) => change("assetsBaseUrl", event.target.value)} /></label></details>
             </fieldset>
             {AUDIO_GENERATION_ENABLED && (
               <fieldset disabled={busy}>
@@ -145,7 +175,7 @@ export default function SystemSettings() {
             )}
             <fieldset disabled={busy}>
               <legend>
-                <b>{AUDIO_GENERATION_ENABLED ? "04" : "03"}</b> {t("assetStorage")}
+                <b>{AUDIO_GENERATION_ENABLED ? "05" : "04"}</b> {t("assetStorage")}
               </legend>
               <p>{t("storageHelp")}</p>
               <label>
@@ -156,7 +186,7 @@ export default function SystemSettings() {
             </fieldset>
             <fieldset disabled={busy}>
               <legend>
-                <b>{AUDIO_GENERATION_ENABLED ? "05" : "04"}</b> {t("taskExecution")}
+                <b>{AUDIO_GENERATION_ENABLED ? "06" : "05"}</b> {t("taskExecution")}
               </legend>
               <div className="settings-grid">
                 <label>

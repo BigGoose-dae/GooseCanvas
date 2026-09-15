@@ -16,6 +16,7 @@ import { useTheme } from "../theme/ThemeContext";
 import { useAutosave } from "../hooks/useAutosave";
 import { nodePayload, mergeTaskState } from "../api/autosave";
 import TaskPanel, { isRunning } from "./TaskPanel";
+import AssetLibraryPanel from "./AssetLibraryPanel";
 import LanguageToggle from "./LanguageToggle";
 import { useLanguage } from "../i18n/LanguageContext";
 import { AUDIO_GENERATION_ENABLED } from "../features";
@@ -657,6 +658,7 @@ export default function CanvasPage() {
           {connection === "connected" ? t("realtime") : t("reconnecting")}
         </span>
         <div className="canvas-actions">
+          <button onClick={() => setPanel({ type: "assets" })}>{t("assetLibrary")}</button>
           <button onClick={() => setPanel({ type: "queue" })}>
             {t("taskQueue")}{" "}
             {tasks.filter((task) => isRunning(task.status)).length || ""}
@@ -822,11 +824,12 @@ export default function CanvasPage() {
           <div className="inspector-utilities">
             <button onClick={() => duplicate(selectedId)}>{t("copyNode")}</button>
             <button onClick={() => openHistory(selectedId)}>{t("generationHistory")}</button>
-            {selectedNode.currentAssetId && (
+            {selectedNode.currentAssetId && selectedNode.asset?.storageProvider === "local" && (
               <a href={api.downloadURL(selectedNode.currentAssetId)} download>
                 ↓ {t("downloadResult")}
               </a>
             )}
+            {selectedNode.asset?.storageProvider === "volcengine" && <span className="trusted-asset-label">{t("trustedAsset")}</span>}
           </div>
           {selectedNode.nodeType === "audio" && !AUDIO_GENERATION_ENABLED ? (
             <p className="inspector-notice">{t("audioUploadOnly")}</p>
@@ -1011,7 +1014,14 @@ export default function CanvasPage() {
           )}
         </aside>
       )}
-      {panel && (
+      {panel?.type === "assets" ? (
+        <AssetLibraryPanel onClose={() => setPanel(null)} onAdd={async (item) => {
+          const bounds = wrapperRef.current?.getBoundingClientRect();
+          const point = flowRef.current?.screenToFlowPosition({ x: (bounds?.left || 0) + (bounds?.width || 800) / 2, y: (bounds?.top || 0) + (bounds?.height || 600) / 2 }) || { x: 100, y: 100 };
+          const created = await api.importLibraryAsset(id, { ...item, posX: point.x, posY: point.y });
+          addLocalNode(created); setPanel(null); setMessage(t("assetAddedToCanvas"));
+        }} />
+      ) : panel && (
         <TaskPanel
           tasks={tasks}
           connection={connection}

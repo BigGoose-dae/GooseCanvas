@@ -65,6 +65,9 @@ func (a *API) Register(r *gin.Engine) {
 	v1.GET("/system/status", a.status)
 	v1.GET("/settings", a.getSettings)
 	v1.PUT("/settings", a.saveSettings)
+	v1.POST("/settings/test-connection", a.testConnection)
+	v1.GET("/asset-library", a.assetLibrary)
+	v1.POST("/workspaces/:id/asset-library/nodes", a.importLibraryAsset)
 	v1.GET("/workspaces/:id/events", a.stream)
 	v1.GET("/workspaces/:id/tasks", a.listTasks)
 	v1.POST("/nodes/:id/duplicate", a.duplicateNode)
@@ -477,6 +480,10 @@ func (a *API) assetContent(c *gin.Context) {
 		a.fail(c, 404, err)
 		return
 	}
+	if view.StorageProvider != "local" {
+		a.fail(c, 400, fmt.Errorf("可信素材保存在火山方舟，不提供本地文件内容"))
+		return
+	}
 	file, info, err := a.current().Store.Open(c.Request.Context(), view.ObjectKey)
 	if err != nil {
 		a.fail(c, 404, err)
@@ -493,6 +500,9 @@ func (a *API) loadAsset(_ context.Context, id uint64) (assetView, error) {
 	var asset domain.Asset
 	if err := a.DB.Where("id=? AND deleted_at IS NULL", id).First(&asset).Error; err != nil {
 		return assetView{}, err
+	}
+	if asset.StorageProvider == "volcengine" {
+		return assetView{Asset: asset}, nil
 	}
 	if a.Store == nil {
 		return assetView{}, fmt.Errorf("本地素材目录不可用")

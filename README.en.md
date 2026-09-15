@@ -16,6 +16,7 @@ Goose Canvas is an open-source, local-first multimedia creation canvas. It lets 
 - Stream queued, submitting, generating, archiving, completed, and failed states through SSE.
 - Browse the task queue and paginated generation history, preview results, and download files.
 - Configure model connections, task concurrency, and polling timeouts in the Web interface.
+- Test the Ark connection and sync the Seedance trusted asset library for the current credentials and project. Active assets can be added to the canvas and used in video generation through `asset://` references.
 - Manage the model registry and add, edit, enable, disable, or delete custom models.
 - Switch between Chinese and English interfaces and between dark and light themes.
 
@@ -58,6 +59,8 @@ npm run dev
 Open `http://localhost:5173`. Vite proxies `/api` requests to `http://localhost:8080`.
 
 On first launch, open **Settings**, enter an Ark API Key, and save it.
+
+To use the Seedance trusted asset library, also enter a Volcengine IAM Access Key, Secret Key, and Ark project name. The inference API Key and IAM AK/SK serve different purposes. The settings page tests both connections separately, and asset counts are synchronized directly from Ark.
 
 ## Build and run
 
@@ -109,6 +112,7 @@ Use the `/settings` page to configure:
 - Application name
 - Ark API Key
 - Ark service URL
+- Seedance trusted asset library IAM Access Key, Secret Key, project name, and control-plane URL
 - Maximum concurrent requests (1–32)
 - Task polling timeout (1–1440 minutes)
 
@@ -125,6 +129,10 @@ Environment variables can also provide initial configuration:
 | `DATA_DIR` | `./data` | Directory for SQLite, the settings key, and local assets |
 | `VOLCENGINE_API_KEY` | Empty | Volcengine Ark API Key |
 | `VOLCENGINE_BASE_URL` | Ark Beijing endpoint | Ark API base URL |
+| `VOLCENGINE_ASSETS_ACCESS_KEY` | Empty | Trusted asset library IAM Access Key |
+| `VOLCENGINE_ASSETS_SECRET_KEY` | Empty | Trusted asset library IAM Secret Key |
+| `VOLCENGINE_ASSETS_PROJECT_NAME` | `default` | Ark project that owns the trusted library |
+| `VOLCENGINE_ASSETS_BASE_URL` | Ark Beijing control-plane endpoint | Trusted asset library API root URL |
 | `WORKER_POLL_INTERVAL` | `3s` | Status polling interval for asynchronous video tasks |
 | `WORKER_TASK_TIMEOUT` | `30m` | Polling timeout for asynchronous tasks |
 

@@ -346,6 +346,10 @@ func (a *API) downloadAsset(c *gin.Context) {
 		a.fail(c, 404, err)
 		return
 	}
+	if view.StorageProvider != "local" {
+		a.fail(c, 400, fmt.Errorf("可信素材保存在火山方舟，无法从本机下载"))
+		return
+	}
 	file, info, err := a.current().Store.Open(c.Request.Context(), view.ObjectKey)
 	if err != nil {
 		a.fail(c, 404, err)

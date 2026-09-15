@@ -10,6 +10,7 @@ type Input struct {
 	Role    string `json:"role"`
 	MIME    string `json:"mime"`
 	DataURI string `json:"-"`
+	URI     string `json:"uri,omitempty"`
 }
 
 type Request struct {
