@@ -22,3 +22,6 @@ bin/
 *.sqlite3-*
 *.pem
 *.key
+
+# Marketing drafts
+articles/
