@@ -198,8 +198,6 @@ GitHub Actions 会执行 Go 测试、前端测试、前端构建和提交历史�
 
 ![公众号二维码](docs/images/wechat-qrcode.jpg)
 
-> 提示：请将公众号二维码图片保存为 `docs/images/wechat-qrcode.jpg`，即可在此处显示。
-
 ### 个人微信
 
 也可以直接加我微信交流：**dae_ai**（备注「Goose Canvas」），我会拉你进用户交流群。
