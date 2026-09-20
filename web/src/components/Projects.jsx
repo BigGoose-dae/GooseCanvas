@@ -14,6 +14,9 @@ export default function Projects() {
   const [status, setStatus] = useState(null);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
 
   const load = async () => {
     try {
@@ -52,6 +55,52 @@ export default function Projects() {
     load();
   };
 
+  const beginRename = (event, item) => {
+    event.stopPropagation();
+    setError("");
+    setRenamingId(item.id);
+    setRenameValue(item.name);
+  };
+
+  const cancelRename = (event) => {
+    event?.stopPropagation();
+    setRenamingId(null);
+    setRenameValue("");
+  };
+
+  const rename = async (event, item) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextName = renameValue.trim();
+    if (!nextName) {
+      setError(t("projectNameRequired"));
+      return;
+    }
+    if (nextName === item.name) {
+      cancelRename(event);
+      return;
+    }
+    try {
+      setRenameSaving(true);
+      setError("");
+      await api.updateWorkspace(item.id, {
+        name: nextName,
+        description: item.description || "",
+      });
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id ? { ...entry, name: nextName } : entry,
+        ),
+      );
+      setRenamingId(null);
+      setRenameValue("");
+    } catch (renameError) {
+      setError(renameError.message);
+    } finally {
+      setRenameSaving(false);
+    }
+  };
+
   const focusNewProject = () =>
     document.querySelector(".new-project-input")?.focus();
 
@@ -63,7 +112,10 @@ export default function Projects() {
           <button onClick={() => navigate("/settings")}>{t("settings")}</button>
           <button onClick={() => navigate("/settings/models")}>{t("modelManagement")}</button>
           <a
-            href={status?.app?.repositoryUrl || "https://github.com"}
+            href={
+              status?.app?.repositoryUrl ||
+              "https://github.com/BigGoose-dae/GooseCanvas"
+            }
             target="_blank"
             rel="noreferrer"
           >
@@ -159,10 +211,12 @@ export default function Projects() {
           <div className="project-grid">
             {items.map((item, index) => (
               <article
-                className="project-card"
+                className={`project-card ${renamingId === item.id ? "renaming" : ""}`}
                 style={{ "--card-index": index }}
                 key={item.id}
-                onClick={() => navigate(`/canvas/${item.id}`)}
+                onClick={() => {
+                  if (renamingId !== item.id) navigate(`/canvas/${item.id}`);
+                }}
               >
                 <div className="project-cover">
                   <div className="project-mini-grid" />
@@ -179,17 +233,51 @@ export default function Projects() {
                   <span>{String(index + 1).padStart(2, "0")}</span>
                 </div>
                 <div className="project-info">
-                  <div>
-                    <h3>{item.name}</h3>
-                    <p>{item.description || t("continueCanvas")}</p>
-                  </div>
-                  <button
-                    className="icon-button"
-                    aria-label={t("deleteProjectLabel", { name: item.name })}
-                    onClick={(event) => remove(event, item.id)}
-                  >
-                    ×
-                  </button>
+                  {renamingId === item.id ? (
+                    <form
+                      className="project-rename-form"
+                      onSubmit={(event) => rename(event, item)}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        maxLength={120}
+                        aria-label={t("renameProject")}
+                        onChange={(event) => setRenameValue(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") cancelRename(event);
+                        }}
+                      />
+                      <button type="submit" disabled={renameSaving} aria-label={t("saveRename")}>✓</button>
+                      <button type="button" onClick={cancelRename} aria-label={t("cancelRename")}>×</button>
+                    </form>
+                  ) : (
+                    <>
+                      <div>
+                        <h3>{item.name}</h3>
+                        <p>{item.description || t("continueCanvas")}</p>
+                      </div>
+                      <div className="project-card-actions">
+                        <button
+                          type="button"
+                          className="icon-button rename-button"
+                          aria-label={t("renameProjectLabel", { name: item.name })}
+                          onClick={(event) => beginRename(event, item)}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label={t("deleteProjectLabel", { name: item.name })}
+                          onClick={(event) => remove(event, item.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </article>
             ))}

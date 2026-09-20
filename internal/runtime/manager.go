@@ -58,6 +58,10 @@ func New(db *gorm.DB, cfg config.Config) (*Manager, error) {
 			return nil, err
 		}
 		cfg.Addr, cfg.DataDir, cfg.Database = boot.Addr, boot.DataDir, boot.Database
+		// The repository link is deployment metadata, not a user-editable setting.
+		// Keep the current environment/default value instead of reviving a stale
+		// copy from the persisted settings snapshot.
+		cfg.RepoURL = boot.RepoURL
 		if strings.TrimSpace(cfg.Volc.AudioEndpoint) == "" {
 			cfg.Volc.AudioEndpoint = boot.Volc.AudioEndpoint
 		}

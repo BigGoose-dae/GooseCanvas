@@ -118,7 +118,7 @@ Use the `/settings` page to configure:
 
 Settings are stored in SQLite, with credentials encrypted using AES-256-GCM. The encryption key is stored at `DATA_DIR/.settings.key`, and the API never returns the original credential value to the page. Leaving the password field blank preserves the saved credential.
 
-Environment variables can also provide initial configuration:
+Environment variables can provide non-sensitive initial configuration. Configure model and asset-library credentials in the Web settings:
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -127,16 +127,13 @@ Environment variables can also provide initial configuration:
 | `APP_REPOSITORY_URL` | Project GitHub URL | Repository link displayed on the home page |
 | `APP_ADDR` | `127.0.0.1:8080` | Go service listen address |
 | `DATA_DIR` | `./data` | Directory for SQLite, the settings key, and local assets |
-| `VOLCENGINE_API_KEY` | Empty | Volcengine Ark API Key |
 | `VOLCENGINE_BASE_URL` | Ark Beijing endpoint | Ark API base URL |
-| `VOLCENGINE_ASSETS_ACCESS_KEY` | Empty | Trusted asset library IAM Access Key |
-| `VOLCENGINE_ASSETS_SECRET_KEY` | Empty | Trusted asset library IAM Secret Key |
 | `VOLCENGINE_ASSETS_PROJECT_NAME` | `default` | Ark project that owns the trusted library |
 | `VOLCENGINE_ASSETS_BASE_URL` | Ark Beijing control-plane endpoint | Trusted asset library API root URL |
 | `WORKER_POLL_INTERVAL` | `3s` | Status polling interval for asynchronous video tasks |
 | `WORKER_TASK_TIMEOUT` | `30m` | Polling timeout for asynchronous tasks |
 
-After Web settings have been saved, database configuration takes precedence. `APP_ADDR` and `DATA_DIR` always come from the startup environment. Restart the service after changing environment variables.
+After Web settings have been saved, database configuration takes precedence, so sensitive values such as model keys do not need to be stored in `.env`. `APP_ADDR` and `DATA_DIR` always come from the startup environment. Restart the service after changing environment variables.
 
 ## Files and task processing
 

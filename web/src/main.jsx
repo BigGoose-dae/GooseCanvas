@@ -8,6 +8,7 @@ import "./node-interaction.css";
 import "./theme.css";
 import "./home.css";
 import "./task-features.css";
+import "./artboard.css";
 import App from "./App";
 import { ThemeProvider } from "./theme/ThemeContext";
 import { LanguageProvider } from "./i18n/LanguageContext";

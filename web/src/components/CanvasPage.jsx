@@ -18,6 +18,7 @@ import { nodePayload, mergeTaskState } from "../api/autosave";
 import TaskPanel, { isRunning } from "./TaskPanel";
 import AssetLibraryPanel from "./AssetLibraryPanel";
 import LanguageToggle from "./LanguageToggle";
+import ModelSelect from "./ModelSelect";
 import { useLanguage } from "../i18n/LanguageContext";
 import { AUDIO_GENERATION_ENABLED } from "../features";
 
@@ -847,18 +848,14 @@ export default function CanvasPage() {
             <>
           <label>
             {t("model")}
-            <select
+            <ModelSelect
+              label={t("model")}
+              options={selectedModels}
               value={selectedNode.modelKey || selectedModel?.key || ""}
-              onChange={(event) =>
-                changeAndSave(selectedId, { modelKey: event.target.value })
+              onChange={(modelKey) =>
+                changeAndSave(selectedId, { modelKey })
               }
-            >
-              {selectedModels.map((model) => (
-                <option key={model.key} value={model.key}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
+            />
           </label>
           <label>
             {t("prompt")}

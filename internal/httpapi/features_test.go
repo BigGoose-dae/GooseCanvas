@@ -94,6 +94,26 @@ func TestSettingsPersistWithoutReturningSecrets(t *testing.T) {
 	}
 }
 
+func TestWorkspaceCanBeRenamedWithoutLosingDescription(t *testing.T) {
+	a, r := featureAPI(t)
+	if err := a.DB.Model(&domain.Workspace{}).Where("id = ?", 1).Update("description", "existing description").Error; err != nil {
+		t.Fatal(err)
+	}
+	response := jsonCall(t, r, "PUT", "/api/v1/workspaces/1", map[string]any{
+		"name": "Renamed workspace", "description": "existing description",
+	})
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("rename: %d %s", response.Code, response.Body.String())
+	}
+	var workspace domain.Workspace
+	if err := a.DB.First(&workspace, 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if workspace.Name != "Renamed workspace" || workspace.Description != "existing description" {
+		t.Fatalf("unexpected workspace after rename: %+v", workspace)
+	}
+}
+
 func TestNodeCopyAndAutosaveDoNotOverwriteGeneratedAsset(t *testing.T) {
 	a, r := featureAPI(t)
 	assetID := uint64(99)

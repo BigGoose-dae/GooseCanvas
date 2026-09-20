@@ -118,7 +118,7 @@ Goose Canvas 内置以下火山引擎模型定义：
 
 设置保存在 SQLite 中，凭证使用 AES-256-GCM 加密。加密密钥位于 `DATA_DIR/.settings.key`，API 不会向页面回传凭证原值。密码框留空时会保留已经保存的凭证。
 
-也可以通过环境变量提供首次启动配置：
+也可以通过环境变量提供非敏感的首次启动配置。模型与素材库凭证请在 Web 设置页中配置：
 
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -127,16 +127,13 @@ Goose Canvas 内置以下火山引擎模型定义：
 | `APP_REPOSITORY_URL` | 项目 GitHub 地址 | 首页显示的仓库链接 |
 | `APP_ADDR` | `127.0.0.1:8080` | Go 服务监听地址 |
 | `DATA_DIR` | `./data` | SQLite、配置密钥和本地素材目录 |
-| `VOLCENGINE_API_KEY` | 空 | 火山引擎方舟 API Key |
 | `VOLCENGINE_BASE_URL` | 方舟北京地址 | 方舟 API 根地址 |
-| `VOLCENGINE_ASSETS_ACCESS_KEY` | 空 | 可信素材库 IAM Access Key |
-| `VOLCENGINE_ASSETS_SECRET_KEY` | 空 | 可信素材库 IAM Secret Key |
 | `VOLCENGINE_ASSETS_PROJECT_NAME` | `default` | 可信素材库所属方舟项目 |
 | `VOLCENGINE_ASSETS_BASE_URL` | 方舟北京管理面地址 | 可信素材库 API 根地址 |
 | `WORKER_POLL_INTERVAL` | `3s` | 异步视频任务状态查询间隔 |
 | `WORKER_TASK_TIMEOUT` | `30m` | 异步任务查询超时 |
 
-Web 设置保存后，以数据库配置为准；`APP_ADDR` 和 `DATA_DIR` 始终由启动环境决定。环境变量变更需要重启服务。
+Web 设置保存后，以数据库配置为准；模型 Key 等敏感字段无需写入 `.env`。`APP_ADDR` 和 `DATA_DIR` 始终由启动环境决定，环境变量变更需要重启服务。
 
 ## 文件与任务处理
 
